@@ -33,6 +33,7 @@ from jax.flatten_util import ravel_pytree
 from blackjax import SamplingAlgorithm
 from blackjax.mcmc.ss import SliceState
 from blackjax.mcmc.ss import build_kernel as build_slice_kernel
+from blackjax.mcmc.ss import init as init_slice
 from blackjax.mcmc.ss import default_stepper_fn
 from blackjax.mcmc.ss import (
     sample_direction_from_covariance as ss_sample_direction_from_covariance,
@@ -148,6 +149,7 @@ def build_kernel(
     stepper_fn: Callable = default_stepper_fn,
     adapt_direction_params_fn: Callable = compute_covariance_from_particles,
     generate_slice_direction_fn: Callable = sample_direction_from_covariance,
+    slice_init_fn: Callable = init_slice,
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> Callable:
@@ -196,7 +198,7 @@ def build_kernel(
         the `NSInfo` for the step.
     """
 
-    slice_kernel = build_slice_kernel(stepper_fn, max_steps, max_shrinkage)
+    slice_kernel = build_slice_kernel(stepper_fn, init_fn=slice_init_fn, max_steps=max_steps, max_shrinkage=max_shrinkage)
 
     @repeat_kernel(num_inner_steps)
     def inner_kernel(
@@ -206,14 +208,14 @@ def build_kernel(
         slice_state = SliceState(
             position=state.position,
             logdensity=state.logprior,
-            constraint=jnp.array([state.loglikelihood]),
+            constraint=state.loglikelihood
         )
         rng_key, prop_key = jax.random.split(rng_key, 2)
         d = generate_slice_direction_fn(prop_key, params)
         logdensity_fn = logprior_fn
-        constraint_fn = lambda x: jnp.array([loglikelihood_fn(x)])
-        constraint = jnp.array([loglikelihood_0])
-        strict = jnp.array([True])
+        constraint_fn = loglikelihood_fn
+        constraint = loglikelihood_0
+        strict = True
         new_slice_state, slice_info = slice_kernel(
             rng_key, slice_state, logdensity_fn, d, constraint_fn, constraint, strict
         )
@@ -222,7 +224,7 @@ def build_kernel(
         return new_state_and_info(
             position=new_slice_state.position,
             logprior=new_slice_state.logdensity,
-            loglikelihood=new_slice_state.constraint[0],
+            loglikelihood=new_slice_state.constraint,
             info=slice_info,
         )
 
@@ -250,6 +252,7 @@ def as_top_level_api(
     stepper_fn: Callable = default_stepper_fn,
     adapt_direction_params_fn: Callable = compute_covariance_from_particles,
     generate_slice_direction_fn: Callable = sample_direction_from_covariance,
+    slice_init_fn: Callable = init_slice,
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> SamplingAlgorithm:
@@ -306,6 +309,7 @@ def as_top_level_api(
         stepper_fn=stepper_fn,
         adapt_direction_params_fn=adapt_direction_params_fn,
         generate_slice_direction_fn=generate_slice_direction_fn,
+        slice_init_fn=slice_init_fn,
         max_steps=max_steps,
         max_shrinkage=max_shrinkage,
     )

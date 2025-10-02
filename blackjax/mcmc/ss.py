@@ -108,6 +108,7 @@ def init(
 
 def build_kernel(
     stepper_fn: Callable,
+    init_fn: Callable = init,
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> Callable:
@@ -151,7 +152,7 @@ def build_kernel(
 
         def slicer(t) -> tuple[SliceState, SliceInfo]:
             x, step_accepted = stepper_fn(state.position, d, t)
-            new_state = init(x, logdensity_fn, constraint_fn)
+            new_state = init_fn(x, logdensity_fn, constraint_fn)
             constraints_ok = jnp.all(
                 jnp.where(
                     strict,
@@ -265,6 +266,7 @@ def horizontal_slice(
 def build_hrss_kernel(
     generate_slice_direction_fn: Callable,
     stepper_fn: Callable,
+    init_fn: Callable = init,
     max_steps: int = 10,
 ) -> Callable:
     """Build a Hit-and-Run Slice Sampling kernel.
@@ -292,7 +294,7 @@ def build_hrss_kernel(
         A kernel function that takes a PRNG key, the current `SliceState`, and
         the log-density function, and returns a new `SliceState` and `SliceInfo`.
     """
-    slice_kernel = build_kernel(stepper_fn, max_steps)
+    slice_kernel = build_kernel(stepper_fn, init_fn=init_fn, max_steps=max_steps)
 
     def kernel(
         rng_key: PRNGKey, state: SliceState, logdensity_fn: Callable
