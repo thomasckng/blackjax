@@ -104,6 +104,7 @@ def init(
 
 
 def build_kernel(
+    slice_fn: Callable[[float], tuple[SliceState, bool]],
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> Callable:
@@ -115,6 +116,10 @@ def build_kernel(
 
     Parameters
     ----------
+    slice_fn
+        A function that takes a scalar parameter `t` and returns a tuple
+        (SliceState, is_accepted) indicating the state at that parameter value
+        and whether it satisfies acceptance criteria.
     max_steps
         The maximum number of steps to take when expanding the interval in
         each direction during the stepping-out phase.
@@ -124,8 +129,7 @@ def build_kernel(
     Returns
     -------
     Callable
-        A kernel function that takes a PRNG key, the current `SliceState`,
-        and a slice_fn that maps parameter `t` to (SliceState, is_accepted),
+        A kernel function that takes a PRNG key and the current `SliceState`,
         and returns a new `SliceState` and `SliceInfo`.
 
     References
@@ -136,7 +140,6 @@ def build_kernel(
     def kernel(
         rng_key: PRNGKey,
         state: SliceState,
-        slice_fn: Callable[[float], tuple[SliceState, bool]],
     ) -> tuple[SliceState, SliceInfo]:
         vs_key, hs_key = jax.random.split(rng_key)
         logslice = state.logdensity + jnp.log(jax.random.uniform(vs_key))
@@ -276,8 +279,6 @@ def build_hrss_kernel(
         A kernel function that takes a PRNG key, the current `SliceState`, and
         the log-density function, and returns a new `SliceState` and `SliceInfo`.
     """
-    slice_kernel = build_kernel(max_steps, max_shrinkage)
-
     def kernel(rng_key: PRNGKey, state: SliceState, logdensity_fn: Callable) -> tuple[SliceState, SliceInfo]:
         rng_key, prop_key = jax.random.split(rng_key, 2)
         d = generate_slice_direction_fn(prop_key)
@@ -288,7 +289,8 @@ def build_hrss_kernel(
             new_state = init(x, logdensity_fn)
             return new_state, is_accepted
 
-        return slice_kernel(rng_key, state, slice_fn)
+        slice_kernel = build_kernel(slice_fn, max_steps, max_shrinkage)
+        return slice_kernel(rng_key, state)
 
     return kernel
 

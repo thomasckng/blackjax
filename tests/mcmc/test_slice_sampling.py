@@ -83,9 +83,6 @@ class SliceSamplingTest(chex.TestCase):
         position = jnp.array([0.0])
         state = ss.init(position, logdensity_fn)
 
-        # Build kernel
-        slice_kernel = ss.build_kernel(max_steps=10, max_shrinkage=100)
-
         # Custom slice_fn that samples along a direction
         direction = jnp.array([1.0])
 
@@ -95,8 +92,11 @@ class SliceSamplingTest(chex.TestCase):
             is_accepted = True
             return new_state, is_accepted
 
+        # Build kernel with slice_fn
+        slice_kernel = ss.build_kernel(slice_fn, max_steps=10, max_shrinkage=100)
+
         # Take one step
-        new_state, info = slice_kernel(key, state, slice_fn)
+        new_state, info = slice_kernel(key, state)
 
         chex.assert_shape(new_state.position, (1,))
         self.assertIsInstance(info, ss.SliceInfo)

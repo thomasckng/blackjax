@@ -222,8 +222,6 @@ def build_kernel(
         the `NSInfo` for the step.
     """
 
-    slice_kernel = build_slice_kernel(max_steps, max_shrinkage)
-
     @repeat_kernel(num_inner_steps)
     def inner_kernel(
         rng_key, state, logprior_fn, loglikelihood_fn, loglikelihood_0, params
@@ -248,7 +246,8 @@ def build_kernel(
             loglikelihood=state.loglikelihood,
         )
 
-        new_slice_state, slice_info = slice_kernel(rng_key, slice_state, slice_fn)
+        slice_kernel = build_slice_kernel(slice_fn, max_steps, max_shrinkage)
+        new_slice_state, slice_info = slice_kernel(rng_key, slice_state)
 
         return new_state_and_info(
             position=new_slice_state.position,
