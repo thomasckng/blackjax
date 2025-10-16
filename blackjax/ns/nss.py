@@ -56,6 +56,20 @@ __all__ = [
 ]
 
 class PartitionedSliceState(NamedTuple):
+    """State used internally by nested slice sampling.
+
+    This extends the basic SliceState to track both the log-prior (logdensity)
+    and log-likelihood values needed for the likelihood contour constraint.
+
+    Attributes
+    ----------
+    position
+        The current position in parameter space.
+    logdensity
+        The log-prior probability at the current position.
+    loglikelihood
+        The log-likelihood value at the current position.
+    """
     position: ArrayLikeTree
     logdensity: float
     loglikelihood: Array
@@ -197,7 +211,7 @@ def build_kernel(
         The number of particles to delete and replace at each NS step.
         Defaults to 1.
     stepper_fn
-        The stepper function `(x, direction, t) -> x_new` for the HRSS kernel.
+        The stepper function `(x, direction, t) -> (x_new, is_accepted)` for the HRSS kernel.
         Defaults to `default_stepper_fn`.
     adapt_direction_params_fn
         A function `(ns_state, ns_info) -> dict_of_params` that computes/adapts
@@ -300,8 +314,8 @@ def as_top_level_api(
         The number of particles to delete and replace at each NS step.
         Defaults to 1.
     stepper_fn
-        The stepper function `(x, direction, t) -> x_new` for the HRSS kernel.
-        Defaults to `default_stepper`.
+        The stepper function `(x, direction, t) -> (x_new, is_accepted)` for the HRSS kernel.
+        Defaults to `default_stepper_fn`.
     adapt_direction_params_fn
         A function `(ns_state, ns_info) -> dict_of_params` that computes/adapts
         the parameters (e.g., covariance matrix) for the slice direction proposal,

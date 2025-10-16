@@ -178,12 +178,12 @@ def horizontal_slice(
     ----------
     rng_key
         A JAX PRNG key.
+    state
+        The current slice sampling state.
     slice_fn
         A function that takes a scalar parameter `t` and returns a tuple
         (SliceState, is_accepted) indicating the state at that parameter value
         and whether it satisfies acceptance criteria.
-    state
-        The current slice sampling state.
     m
         The maximum number of steps to take when expanding the interval in
         each direction during the stepping-out phase.
