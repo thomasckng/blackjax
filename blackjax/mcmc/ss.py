@@ -136,19 +136,19 @@ def build_kernel(
     def kernel(
         rng_key: PRNGKey,
         state: SliceState,
-        slicer: Callable,
+        slice_fn: Callable,
     ) -> tuple[SliceState, SliceInfo]:
         vs_key, hs_key = jax.random.split(rng_key)
         logslice = state.logdensity + jnp.log(jax.random.uniform(vs_key))
         vertical_is_accepted = logslice < state.logdensity
 
-        def _slicer(t):
-            new_state, is_accepted = slicer(t)
+        def _slice_fn(t):
+            new_state, is_accepted = slice_fn(t)
             in_slice = new_state.logdensity >= logslice
             return new_state, is_accepted & in_slice
 
         new_state, info = horizontal_slice(
-            hs_key, state, _slicer, max_steps, max_shrinkage
+            hs_key, state, _slice_fn, max_steps, max_shrinkage
         )
         info = info._replace(is_accepted=info.is_accepted & vertical_is_accepted)
         return new_state, info
@@ -159,7 +159,7 @@ def build_kernel(
 def horizontal_slice(
     rng_key: PRNGKey,
     state: SliceState,
-    slicer: Callable,
+    slice_fn: Callable,
     m: int,
     max_shrinkage: int,
 ) -> tuple[SliceState, SliceInfo]:
@@ -176,7 +176,7 @@ def horizontal_slice(
     ----------
     rng_key
         A JAX PRNG key.
-    slicer
+    slice_fn
         A function that takes a scalar `t` and returns a state and info on the
         slice.
     state
@@ -204,7 +204,7 @@ def horizontal_slice(
     def step_body_fun(carry):
         i, s, t, _ = carry
         t += s
-        _, is_accepted = slicer(t)
+        _, is_accepted = slice_fn(t)
         i -= 1
         return i, s, t, is_accepted
 
@@ -224,7 +224,7 @@ def horizontal_slice(
         rng_key, subkey = jax.random.split(rng_key)
         u = jax.random.uniform(subkey, minval=l, maxval=r)
 
-        new_state, is_accepted = slicer(u)
+        new_state, is_accepted = slice_fn(u)
         n += 1
 
         l = jnp.where(u < 0, u, l)
@@ -277,13 +277,13 @@ def build_hrss_kernel(
         rng_key, prop_key = jax.random.split(rng_key, 2)
         d = generate_slice_direction_fn(prop_key)
 
-        def slicer(t):
+        def slice_fn(t):
             x = jax.tree.map(lambda x, d: x + t * d, x, d)
             is_accepted = True
             new_state = SliceState(x, logdensity_fn(x))
             return new_state, is_accepted
 
-        return slice_kernel(rng_key, state, slicer)
+        return slice_kernel(rng_key, state, slice_fn)
 
     return kernel
 

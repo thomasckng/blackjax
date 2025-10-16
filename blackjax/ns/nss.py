@@ -231,7 +231,7 @@ def build_kernel(
         rng_key, prop_key = jax.random.split(rng_key, 2)
         d = generate_slice_direction_fn(prop_key, params)
 
-        def slicer(t) -> tuple[PartitionedSliceState, SliceInfo]:
+        def slice_fn(t) -> tuple[PartitionedSliceState, SliceInfo]:
             x, step_accepted = stepper_fn(state.position, d, t)
             new_state = PartitionedSliceState(
                 position=x,
@@ -248,7 +248,7 @@ def build_kernel(
             loglikelihood=state.loglikelihood,
         )
 
-        new_slice_state, slice_info = slice_kernel(rng_key, slice_state, slicer)
+        new_slice_state, slice_info = slice_kernel(rng_key, slice_state, slice_fn)
 
         return new_state_and_info(
             position=new_slice_state.position,
