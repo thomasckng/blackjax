@@ -125,8 +125,8 @@ def build_kernel(
     -------
     Callable
         A kernel function that takes a PRNG key, the current `SliceState`,
-        the log-density function and the function defining the slice, and
-        returns a new `SliceState` and `SliceInfo`.
+        and a slice_fn that maps parameter `t` to (SliceState, is_accepted),
+        and returns a new `SliceState` and `SliceInfo`.
 
     References
     ----------
@@ -166,19 +166,19 @@ def horizontal_slice(
     """Propose a new sample using the stepping-out and shrinking procedures.
 
     This function implements the core of the Hit-and-Run Slice Sampling algorithm.
-    It first expands an interval (`[l, r]`) along the slice starting
-    from `x0` and proceeding along direction `d` until both ends are outside
-    the slice defined by `logslice` (stepping-out). Then, it samples
-    points uniformly from this interval and shrinks the interval until a point
-    is found that lies within the slice (shrinking).
+    It first expands an interval (`[l, r]`) along a one-dimensional parameterization
+    until both ends are outside the slice defined by `logslice` (stepping-out).
+    Then, it samples points uniformly from this interval and shrinks the interval
+    until a point is found that lies within the slice (shrinking).
 
     Parameters
     ----------
     rng_key
         A JAX PRNG key.
     slice_fn
-        A function that takes a scalar `t` and returns a state and info on the
-        slice.
+        A function that takes a scalar parameter `t` and returns a tuple
+        (SliceState, is_accepted) indicating the state at that parameter value
+        and whether it satisfies acceptance criteria.
     state
         The current slice sampling state.
     m
@@ -264,6 +264,11 @@ def build_hrss_kernel(
         A function that, given a PRNG key, generates a direction vector (PyTree
         with the same structure as the position) for the "hit-and-run" part of
         the algorithm. This direction is typically normalized.
+    max_steps
+        The maximum number of steps to take when expanding the interval in
+        each direction during the stepping-out phase.
+    max_shrinkage
+        The maximum number of shrinking steps to perform to avoid infinite loops.
 
     Returns
     -------
@@ -333,9 +338,14 @@ def hrss_as_top_level_api(
     logdensity_fn
         The log-density function of the target distribution to sample from.
     cov
-        The covariance matrix used by the default direction proposal function
-        (`default_proposal_distribution`). This matrix shapes the random
+        The covariance matrix used by the direction proposal function
+        (`sample_direction_from_covariance`). This matrix shapes the random
         directions proposed for the slice sampling steps.
+    max_steps
+        The maximum number of steps to take when expanding the interval in
+        each direction during the stepping-out phase.
+    max_shrinkage
+        The maximum number of shrinking steps to perform to avoid infinite loops.
 
     Returns
     -------
