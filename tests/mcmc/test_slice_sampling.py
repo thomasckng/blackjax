@@ -233,7 +233,9 @@ class SliceSamplingTest(chex.TestCase):
             is_accepted = jnp.abs(t) <= 1.0
             return new_state, is_accepted
 
-        new_state, info = ss.horizontal_slice(key, state, slice_fn, m=10, max_shrinkage=100)
+        new_state, info = ss.horizontal_slice(
+            key, state, slice_fn, m=10, max_shrinkage=100
+        )
 
         # Should find a point within [-1, 1]
         self.assertLessEqual(jnp.abs(new_state.position[0]), 1.0)

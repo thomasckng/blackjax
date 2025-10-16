@@ -24,7 +24,7 @@ set of live particles.
 """
 
 from functools import partial
-from typing import Callable, Dict, Optional, NamedTuple
+from typing import Callable, Dict, NamedTuple, Optional
 
 import jax
 import jax.numpy as jnp
@@ -46,14 +46,14 @@ from blackjax.smc.tuning.from_particles import (
     particles_as_rows,
     particles_covariance_matrix,
 )
-from blackjax.types import ArrayTree, PRNGKey, ArrayLikeTree, Array
-from blackjax.mcmc.ss import init as ss_init
+from blackjax.types import Array, ArrayLikeTree, ArrayTree, PRNGKey
 
 __all__ = [
     "init",
     "as_top_level_api",
     "build_kernel",
 ]
+
 
 class PartitionedSliceState(NamedTuple):
     """State used internally by nested slice sampling.
@@ -70,6 +70,7 @@ class PartitionedSliceState(NamedTuple):
     loglikelihood
         The log-likelihood value at the current position.
     """
+
     position: ArrayLikeTree
     logdensity: float
     loglikelihood: Array
@@ -249,7 +250,7 @@ def build_kernel(
                 position=x,
                 logdensity=logprior_fn(x),
                 loglikelihood=loglikelihood_fn(x),
-                )
+            )
             in_contour = new_state.loglikelihood > loglikelihood_0
             is_accepted = in_contour & step_accepted
             return new_state, is_accepted

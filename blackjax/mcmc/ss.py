@@ -83,9 +83,7 @@ class SliceInfo(NamedTuple):
     num_shrink: int
 
 
-def init(
-    position: ArrayTree, logdensity_fn: Callable
-) -> SliceState:
+def init(position: ArrayTree, logdensity_fn: Callable) -> SliceState:
     """Initialize the Slice Sampler state.
 
     Parameters
@@ -279,7 +277,10 @@ def build_hrss_kernel(
         A kernel function that takes a PRNG key, the current `SliceState`, and
         the log-density function, and returns a new `SliceState` and `SliceInfo`.
     """
-    def kernel(rng_key: PRNGKey, state: SliceState, logdensity_fn: Callable) -> tuple[SliceState, SliceInfo]:
+
+    def kernel(
+        rng_key: PRNGKey, state: SliceState, logdensity_fn: Callable
+    ) -> tuple[SliceState, SliceInfo]:
         rng_key, prop_key = jax.random.split(rng_key, 2)
         d = generate_slice_direction_fn(prop_key)
 
