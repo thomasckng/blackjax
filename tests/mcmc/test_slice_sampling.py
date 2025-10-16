@@ -40,40 +40,18 @@ class SliceSamplingTest(chex.TestCase):
         expected_logdensity = logdensity_fn(position)
         chex.assert_trees_all_close(state.logdensity, expected_logdensity)
 
-    def test_vertical_slice(self):
-        """Test vertical slice height sampling"""
-        key = jax.random.key(123)
-        position = jnp.array([0.0])
-        state = ss.init(position, logdensity_fn)
-
-        # Sample many slice heights
-        keys = jax.random.split(key, 1000)
-        new_state, info = jax.vmap(ss.vertical_slice, in_axes=(0, None))(keys, state)
-
-        # Heights should be below log density at position
-        logdens_at_pos = logdensity_fn(position)
-        self.assertTrue(jnp.all(new_state.logslice <= logdens_at_pos))
-
-        # Heights should be reasonably distributed
-        mean_height = jnp.mean(new_state.logslice)
-        expected_mean = logdens_at_pos - 1.0  # E[log(U)] = -1 for U~Uniform(0,1)
-        chex.assert_trees_all_close(mean_height, expected_mean, atol=0.1)
-
     @parameterized.parameters([1, 2, 5])
     def test_slice_sampling_dimensions(self, ndim):
         """Test slice sampling in different dimensions"""
         key = jax.random.key(456)
         position = jnp.zeros(ndim)
 
-        # Simple step function
-        def stepper_fn(x, d, t):
-            return x + t * d
-
-        # Build kernel
+        # Build kernel with normalized random direction
         def direction_fn(rng_key):
-            return jax.random.normal(rng_key, (ndim,))
+            d = jax.random.normal(rng_key, (ndim,))
+            return d / jnp.linalg.norm(d)
 
-        kernel = ss.build_hrss_kernel(direction_fn, stepper_fn)
+        kernel = ss.build_hrss_kernel(direction_fn)
         state = ss.init(position, logdensity_fn)
 
         # Take one step
@@ -81,37 +59,47 @@ class SliceSamplingTest(chex.TestCase):
 
         chex.assert_shape(new_state.position, (ndim,))
         self.assertIsInstance(new_state.logdensity, (float, jax.Array))
+        self.assertIsInstance(info.is_accepted, (bool, jax.Array))
 
     def test_constrained_slice_sampling(self):
-        """Test slice sampling with constraints"""
+        """Test slice sampling with constraints via logdensity"""
         key = jax.random.key(789)
         position = jnp.array([1.0])  # Start in valid region
 
-        def stepper_fn(x, d, t):
-            return x + t * d
+        cov = jnp.eye(1)
+        algorithm = ss.hrss_as_top_level_api(constrained_logdensity, cov)
+        state = algorithm.init(position)
 
-        kernel = ss.build_kernel(stepper_fn)
-        state = ss.init(position, constrained_logdensity)
+        # Take multiple steps
+        for _ in range(10):
+            key, subkey = jax.random.split(key)
+            state, info = algorithm.step(subkey, state)
+            # Should remain in valid region (x > 0)
+            self.assertTrue(jnp.all(state.position > 0))
 
-        # Direction pointing outward
+    def test_build_kernel_with_custom_slice_fn(self):
+        """Test build_kernel with custom slice_fn"""
+        key = jax.random.key(111)
+        position = jnp.array([0.0])
+        state = ss.init(position, logdensity_fn)
+
+        # Build kernel
+        slice_kernel = ss.build_kernel(max_steps=10, max_shrinkage=100)
+
+        # Custom slice_fn that samples along a direction
         direction = jnp.array([1.0])
 
-        # Constraint function
-        def constraint_fn(x):
-            return jnp.array([])  # No additional constraints for this test
+        def slice_fn(t):
+            new_position = state.position + t * direction
+            new_state = ss.SliceState(new_position, logdensity_fn(new_position))
+            is_accepted = True
+            return new_state, is_accepted
 
-        new_state, info = kernel(
-            key,
-            state,
-            constrained_logdensity,
-            direction,
-            constraint_fn,
-            jnp.array([]),
-            jnp.array([]),
-        )
+        # Take one step
+        new_state, info = slice_kernel(key, state, slice_fn)
 
-        # Should remain in valid region
-        self.assertTrue(jnp.all(new_state.position > 0))
+        chex.assert_shape(new_state.position, (1,))
+        self.assertIsInstance(info, ss.SliceInfo)
 
     def test_default_direction_generation(self):
         """Test default direction generation function"""
@@ -143,6 +131,7 @@ class SliceSamplingTest(chex.TestCase):
         new_state, info = algorithm.step(key, state)
 
         chex.assert_shape(new_state.position, (2,))
+        self.assertIsInstance(info.is_accepted, (bool, jax.Array))
 
     def test_slice_sampling_statistical_correctness(self):
         """Test that slice sampling produces correct statistics"""
@@ -187,49 +176,68 @@ class SliceSamplingTest(chex.TestCase):
         self.assertGreater(sample_std, 0.1, "Standard deviation is too small")
         self.assertLess(sample_std, 5.0, "Standard deviation is too large")
 
-    def test_default_stepper_fn(self):
-        """Test default stepper function"""
-        x = jnp.array([1.0, 2.0])
-        d = jnp.array([0.5, -0.5])
-        t = 2.0
-
-        result = ss.default_stepper_fn(x, d, t)
-        expected = x + t * d
-
-        chex.assert_trees_all_close(result, expected)
-
     def test_slice_info_structure(self):
         """Test that SliceInfo contains expected fields"""
         key = jax.random.key(789)
         position = jnp.array([0.0])
 
-        def stepper_fn(x, d, t):
-            return x + t * d
+        cov = jnp.eye(1)
+        algorithm = ss.hrss_as_top_level_api(logdensity_fn, cov)
+        state = algorithm.init(position)
 
-        kernel = ss.build_kernel(stepper_fn)
-        state = ss.init(position, logdensity_fn)
-        direction = jnp.array([1.0])
-
-        def constraint_fn(x):
-            return jnp.array([])
-
-        new_state, info = kernel(
-            key,
-            state,
-            logdensity_fn,
-            direction,
-            constraint_fn,
-            jnp.array([]),
-            jnp.array([]),
-        )
+        new_state, info = algorithm.step(key, state)
 
         # Check that info has expected structure
         self.assertIsInstance(info, ss.SliceInfo)
-        self.assertTrue(hasattr(info, "constraint"))
-        self.assertTrue(hasattr(info, "l_steps"))
-        self.assertTrue(hasattr(info, "r_steps"))
-        self.assertTrue(hasattr(info, "s_steps"))
-        self.assertTrue(hasattr(info, "evals"))
+        self.assertTrue(hasattr(info, "is_accepted"))
+        self.assertTrue(hasattr(info, "num_steps"))
+        self.assertTrue(hasattr(info, "num_shrink"))
+
+        # Check types
+        self.assertIsInstance(info.is_accepted, (bool, jax.Array))
+        self.assertIsInstance(info.num_steps, (int, jax.Array))
+        self.assertIsInstance(info.num_shrink, (int, jax.Array))
+
+    def test_multimodal_sampling(self):
+        """Test slice sampling on multimodal distribution"""
+        key = jax.random.key(999)
+        position = jnp.array([2.5])  # Start near first mode
+
+        cov = jnp.eye(1) * 4.0  # Large covariance for mode hopping
+        algorithm = ss.hrss_as_top_level_api(multimodal_logdensity, cov)
+        state = algorithm.init(position)
+
+        # Run a few steps
+        samples = []
+        for _ in range(50):
+            key, subkey = jax.random.split(key)
+            state, info = algorithm.step(subkey, state)
+            samples.append(state.position[0])
+
+        samples = jnp.array(samples)
+
+        # Just check that sampling works without errors
+        self.assertFalse(jnp.isnan(samples).any())
+        self.assertFalse(jnp.isinf(samples).any())
+
+    def test_horizontal_slice_basic(self):
+        """Test horizontal_slice function directly"""
+        key = jax.random.key(321)
+        position = jnp.array([0.0])
+        state = ss.init(position, logdensity_fn)
+
+        # Simple slice_fn that accepts positions in [-1, 1]
+        def slice_fn(t):
+            new_position = jnp.array([t])
+            new_state = ss.SliceState(new_position, logdensity_fn(new_position))
+            is_accepted = jnp.abs(t) <= 1.0
+            return new_state, is_accepted
+
+        new_state, info = ss.horizontal_slice(key, state, slice_fn, m=10, max_shrinkage=100)
+
+        # Should find a point within [-1, 1]
+        self.assertLessEqual(jnp.abs(new_state.position[0]), 1.0)
+        self.assertIsInstance(info, ss.SliceInfo)
 
 
 if __name__ == "__main__":
