@@ -136,7 +136,7 @@ def build_kernel(
     def kernel(
         rng_key: PRNGKey,
         state: SliceState,
-        slice_fn: Callable,
+        slice_fn: Callable[[float], tuple[SliceState, bool]],
     ) -> tuple[SliceState, SliceInfo]:
         vs_key, hs_key = jax.random.split(rng_key)
         logslice = state.logdensity + jnp.log(jax.random.uniform(vs_key))
@@ -159,7 +159,7 @@ def build_kernel(
 def horizontal_slice(
     rng_key: PRNGKey,
     state: SliceState,
-    slice_fn: Callable,
+    slice_fn: Callable[[float], tuple[SliceState, bool]],
     m: int,
     max_shrinkage: int,
 ) -> tuple[SliceState, SliceInfo]:
@@ -247,7 +247,7 @@ def horizontal_slice(
 
 
 def build_hrss_kernel(
-    generate_slice_direction_fn: Callable,
+    generate_slice_direction_fn: Callable[[PRNGKey], ArrayTree],
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> Callable:
