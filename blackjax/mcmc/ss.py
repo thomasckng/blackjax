@@ -280,7 +280,7 @@ def build_hrss_kernel(
         def slice_fn(t):
             x = jax.tree.map(lambda x, d: x + t * d, state.position, d)
             is_accepted = True
-            new_state = SliceState(x, logdensity_fn(x))
+            new_state = init(x, logdensity_fn)
             return new_state, is_accepted
 
         return slice_kernel(rng_key, state, slice_fn)
