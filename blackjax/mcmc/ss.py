@@ -59,7 +59,6 @@ class SliceState(NamedTuple):
 
     position: ArrayLikeTree
     logdensity: float
-    constraint: Array
 
 
 class SliceInfo(NamedTuple):
@@ -72,8 +71,6 @@ class SliceInfo(NamedTuple):
     ----------
     is_accepted
         A boolean indicating whether the proposed sample was accepted.
-    constraint
-        The constraint values at the final accepted position.
     num_steps
         The number of steps taken to expand the interval during the "stepping-out" phase.
     num_shrink
@@ -87,7 +84,7 @@ class SliceInfo(NamedTuple):
 
 
 def init(
-    position: ArrayTree, logdensity_fn: Callable, constraint_fn: Callable
+    position: ArrayTree, logdensity_fn: Callable
 ) -> SliceState:
     """Initialize the Slice Sampler state.
 
@@ -103,11 +100,10 @@ def init(
     SliceState
         The initial state of the Slice Sampler.
     """
-    return SliceState(position, logdensity_fn(position), constraint_fn(position))
+    return SliceState(position, logdensity_fn(position))
 
 
 def build_kernel(
-    stepper_fn: Callable,
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> Callable:
@@ -119,17 +115,18 @@ def build_kernel(
 
     Parameters
     ----------
-    stepper_fn
-        A function that computes a new position given an initial position,
-        direction `d` and a slice parameter `t`.
-        `(x0, d, t) -> x_new` where e.g. `x_new = x0 + t * d`.
+    max_steps
+        The maximum number of steps to take when expanding the interval in
+        each direction during the stepping-out phase.
+    max_shrinkage
+        The maximum number of shrinking steps to perform to avoid infinite loops.
 
     Returns
     -------
     Callable
         A kernel function that takes a PRNG key, the current `SliceState`,
-        the log-density function, direction `d`, constraint function, constraint
-        values, and strict flags, and returns a new `SliceState` and `SliceInfo`.
+        the log-density function and the function defining the slice, and
+        returns a new `SliceState` and `SliceInfo`.
 
     References
     ----------
@@ -139,32 +136,19 @@ def build_kernel(
     def kernel(
         rng_key: PRNGKey,
         state: SliceState,
-        logdensity_fn: Callable,
-        d: ArrayTree,
-        constraint_fn: Callable,
-        constraint: Array,
-        strict: Array,
+        slicer: Callable,
     ) -> tuple[SliceState, SliceInfo]:
         vs_key, hs_key = jax.random.split(rng_key)
         logslice = state.logdensity + jnp.log(jax.random.uniform(vs_key))
         vertical_is_accepted = logslice < state.logdensity
 
-        def slicer(t) -> tuple[SliceState, SliceInfo]:
-            x, step_accepted = stepper_fn(state.position, d, t)
-            new_state = init(x, logdensity_fn, constraint_fn)
-            constraints_ok = jnp.all(
-                jnp.where(
-                    strict,
-                    new_state.constraint > constraint,
-                    new_state.constraint >= constraint,
-                )
-            )
+        def _slicer(t):
+            new_state, is_accepted = slicer(t)
             in_slice = new_state.logdensity >= logslice
-            is_accepted = in_slice & constraints_ok & step_accepted
-            return new_state, is_accepted
+            return new_state, is_accepted & in_slice
 
         new_state, info = horizontal_slice(
-            hs_key, slicer, state, max_steps, max_shrinkage
+            hs_key, state, _slicer, max_steps, max_shrinkage
         )
         info = info._replace(is_accepted=info.is_accepted & vertical_is_accepted)
         return new_state, info
@@ -174,8 +158,8 @@ def build_kernel(
 
 def horizontal_slice(
     rng_key: PRNGKey,
-    slicer: Callable,
     state: SliceState,
+    slicer: Callable,
     m: int,
     max_shrinkage: int,
 ) -> tuple[SliceState, SliceInfo]:
@@ -264,8 +248,8 @@ def horizontal_slice(
 
 def build_hrss_kernel(
     generate_slice_direction_fn: Callable,
-    stepper_fn: Callable,
     max_steps: int = 10,
+    max_shrinkage: int = 100,
 ) -> Callable:
     """Build a Hit-and-Run Slice Sampling kernel.
 
@@ -281,53 +265,27 @@ def build_hrss_kernel(
         with the same structure as the position) for the "hit-and-run" part of
         the algorithm. This direction is typically normalized.
 
-    stepper_fn
-        A function that computes a new position given an initial position, a
-        direction, and a step size `t`. It should implement something analogous
-        to `x_new = x_initial + t * direction`.
-
     Returns
     -------
     Callable
         A kernel function that takes a PRNG key, the current `SliceState`, and
         the log-density function, and returns a new `SliceState` and `SliceInfo`.
     """
-    slice_kernel = build_kernel(stepper_fn, max_steps)
+    slice_kernel = build_kernel(max_steps, max_shrinkage)
 
-    def kernel(
-        rng_key: PRNGKey, state: SliceState, logdensity_fn: Callable
-    ) -> tuple[SliceState, SliceInfo]:
+    def kernel(rng_key: PRNGKey, state: SliceState) -> tuple[SliceState, SliceInfo]:
         rng_key, prop_key = jax.random.split(rng_key, 2)
         d = generate_slice_direction_fn(prop_key)
-        constraint_fn = lambda x: jnp.array([])
-        constraint = jnp.array([])
-        strict = jnp.array([], dtype=bool)
-        return slice_kernel(
-            rng_key, state, logdensity_fn, d, constraint_fn, constraint, strict
-        )
+
+        def slicer(t):
+            x = jax.tree.map(lambda x, d: x + t * d, x, d)
+            is_accepted = True
+            new_state = SliceState(x, logdensity_fn(x))
+            return new_state, is_accepted
+
+        return slice_kernel(rng_key, state, slicer)
 
     return kernel
-
-
-def default_stepper_fn(x: ArrayTree, d: ArrayTree, t: float) -> ArrayTree:
-    """A simple stepper function that moves from `x` along direction `d` by `t` units.
-
-    Implements the operation: `x_new = x + t * d`.
-
-    Parameters
-    ----------
-    x
-        The starting position (PyTree).
-    d
-        The direction of movement (PyTree, same structure as `x`).
-    t
-        The scalar step size or distance along the direction.
-
-    Returns
-    -------
-    position, is_accepted
-    """
-    return jax.tree.map(lambda x, d: x + t * d, x, d), True
 
 
 def sample_direction_from_covariance(rng_key: PRNGKey, cov: Array) -> Array:
@@ -361,6 +319,8 @@ def sample_direction_from_covariance(rng_key: PRNGKey, cov: Array) -> Array:
 def hrss_as_top_level_api(
     logdensity_fn: Callable,
     cov: Array,
+    max_steps: int = 10,
+    max_shrinkage: int = 100,
 ) -> SamplingAlgorithm:
     """Creates a Hit-and-Run Slice Sampling algorithm.
 
@@ -384,7 +344,7 @@ def hrss_as_top_level_api(
         the configured Hit-and-Run Slice Sampler.
     """
     generate_slice_direction_fn = partial(sample_direction_from_covariance, cov=cov)
-    kernel = build_hrss_kernel(generate_slice_direction_fn, default_stepper_fn)
+    kernel = build_hrss_kernel(generate_slice_direction_fn, max_steps, max_shrinkage)
     init_fn = partial(init, logdensity_fn=logdensity_fn)
     step_fn = partial(kernel, logdensity_fn=logdensity_fn)
     return SamplingAlgorithm(init_fn, step_fn)

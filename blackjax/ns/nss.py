@@ -24,16 +24,15 @@ set of live particles.
 """
 
 from functools import partial
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, NamedTuple
 
 import jax
 import jax.numpy as jnp
 from jax.flatten_util import ravel_pytree
 
 from blackjax import SamplingAlgorithm
-from blackjax.mcmc.ss import SliceState
+from blackjax.mcmc.ss import SliceInfo
 from blackjax.mcmc.ss import build_kernel as build_slice_kernel
-from blackjax.mcmc.ss import default_stepper_fn
 from blackjax.mcmc.ss import (
     sample_direction_from_covariance as ss_sample_direction_from_covariance,
 )
@@ -47,13 +46,40 @@ from blackjax.smc.tuning.from_particles import (
     particles_as_rows,
     particles_covariance_matrix,
 )
-from blackjax.types import ArrayTree, PRNGKey
+from blackjax.types import ArrayTree, PRNGKey, ArrayLikeTree, Array
+from blackjax.mcmc.ss import init as ss_init
 
 __all__ = [
     "init",
     "as_top_level_api",
     "build_kernel",
 ]
+
+class PartitionedSliceState(NamedTuple):
+    position: ArrayLikeTree
+    logdensity: float
+    loglikelihood: Array
+
+
+def default_stepper_fn(x: ArrayTree, d: ArrayTree, t: float) -> ArrayTree:
+    """A simple stepper function that moves from `x` along direction `d` by `t` units.
+
+    Implements the operation: `x_new = x + t * d`.
+
+    Parameters
+    ----------
+    x
+        The starting position (PyTree).
+    d
+        The direction of movement (PyTree, same structure as `x`).
+    t
+        The scalar step size or distance along the direction.
+
+    Returns
+    -------
+    position, is_accepted
+    """
+    return jax.tree.map(lambda x, d: x + t * d, x, d), True
 
 
 def sample_direction_from_covariance(
@@ -196,47 +222,49 @@ def build_kernel(
         the `NSInfo` for the step.
     """
 
-    slice_kernel = build_slice_kernel(stepper_fn, max_steps, max_shrinkage)
+    slice_kernel = build_slice_kernel(max_steps, max_shrinkage)
 
     @repeat_kernel(num_inner_steps)
     def inner_kernel(
         rng_key, state, logprior_fn, loglikelihood_fn, loglikelihood_0, params
     ):
-        # Do constrained slice sampling
-        slice_state = SliceState(
-            position=state.position,
-            logdensity=state.logprior,
-            constraint=jnp.array([state.loglikelihood]),
-        )
         rng_key, prop_key = jax.random.split(rng_key, 2)
         d = generate_slice_direction_fn(prop_key, params)
-        logdensity_fn = logprior_fn
-        constraint_fn = lambda x: jnp.array([loglikelihood_fn(x)])
-        constraint = jnp.array([loglikelihood_0])
-        strict = jnp.array([True])
-        new_slice_state, slice_info = slice_kernel(
-            rng_key, slice_state, logdensity_fn, d, constraint_fn, constraint, strict
+
+        def slicer(t) -> tuple[PartitionedSliceState, SliceInfo]:
+            x, step_accepted = stepper_fn(state.position, d, t)
+            new_state = PartitionedSliceState(
+                position=x,
+                logdensity=logprior_fn(x),
+                loglikelihood=loglikelihood_fn(x),
+                )
+            in_contour = new_state.loglikelihood > loglikelihood_0
+            is_accepted = in_contour & step_accepted
+            return new_state, is_accepted
+
+        slice_state = PartitionedSliceState(
+            position=state.position,
+            logdensity=state.logprior,
+            loglikelihood=state.loglikelihood,
         )
 
-        # Pass the relevant information back to PartitionedState and PartitionedInfo
+        new_slice_state, slice_info = slice_kernel(rng_key, slice_state, slicer)
+
         return new_state_and_info(
             position=new_slice_state.position,
             logprior=new_slice_state.logdensity,
-            loglikelihood=new_slice_state.constraint[0],
+            loglikelihood=new_slice_state.loglikelihood,
             info=slice_info,
         )
 
     delete_fn = partial(default_delete_fn, num_delete=num_delete)
-
-    # Vectorize the inner kernel for parallel execution
-    in_axes = (0, 0, None, None, None, None)
 
     update_inner_kernel_params_fn = adapt_direction_params_fn
     kernel = build_adaptive_kernel(
         logprior_fn,
         loglikelihood_fn,
         delete_fn,
-        jax.vmap(inner_kernel, in_axes=in_axes),
+        jax.vmap(inner_kernel, in_axes=(0, 0, None, None, None, None)),
         update_inner_kernel_params_fn,
     )
     return kernel
