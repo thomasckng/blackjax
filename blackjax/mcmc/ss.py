@@ -273,12 +273,12 @@ def build_hrss_kernel(
     """
     slice_kernel = build_kernel(max_steps, max_shrinkage)
 
-    def kernel(rng_key: PRNGKey, state: SliceState) -> tuple[SliceState, SliceInfo]:
+    def kernel(rng_key: PRNGKey, state: SliceState, logdensity_fn: Callable) -> tuple[SliceState, SliceInfo]:
         rng_key, prop_key = jax.random.split(rng_key, 2)
         d = generate_slice_direction_fn(prop_key)
 
         def slice_fn(t):
-            x = jax.tree.map(lambda x, d: x + t * d, x, d)
+            x = jax.tree.map(lambda x, d: x + t * d, state.position, d)
             is_accepted = True
             new_state = SliceState(x, logdensity_fn(x))
             return new_state, is_accepted
