@@ -40,7 +40,7 @@ from blackjax.ns.adaptive import build_kernel as build_adaptive_kernel
 from blackjax.ns.adaptive import init
 from blackjax.ns.base import NSInfo, NSState
 from blackjax.ns.base import delete_fn as default_delete_fn
-from blackjax.ns.base import new_state_and_info
+from blackjax.ns.base import PartitionedState
 from blackjax.ns.utils import get_first_row, repeat_kernel
 from blackjax.smc.tuning.from_particles import (
     particles_as_rows,
@@ -74,6 +74,15 @@ class PartitionedSliceState(NamedTuple):
     position: ArrayLikeTree
     logdensity: float
     loglikelihood: Array
+
+
+class NSSInfo(NamedTuple):
+    position: ArrayTree
+    logprior: ArrayTree
+    loglikelihood: ArrayTree
+    is_accepted: bool
+    num_steps: int
+    num_shrink: int
 
 
 def default_stepper_fn(x: ArrayTree, d: ArrayTree, t: float) -> ArrayTree:
@@ -264,12 +273,21 @@ def build_kernel(
         slice_kernel = build_slice_kernel(slice_fn, max_steps, max_shrinkage)
         new_slice_state, slice_info = slice_kernel(rng_key, slice_state)
 
-        return new_state_and_info(
+        new_state = PartitionedState(
             position=new_slice_state.position,
             logprior=new_slice_state.logdensity,
             loglikelihood=new_slice_state.loglikelihood,
-            info=slice_info,
         )
+        info = NSSInfo(
+            position=new_slice_state.position,
+            logprior=new_slice_state.logdensity,
+            loglikelihood=new_slice_state.loglikelihood,
+            is_accepted=slice_info.is_accepted,
+            num_steps=slice_info.num_steps,
+            num_shrink=slice_info.num_shrink
+        )
+        return new_state, info
+
 
     delete_fn = partial(default_delete_fn, num_delete=num_delete)
 

@@ -166,43 +166,6 @@ class PartitionedInfo(NamedTuple):
     info: NamedTuple
 
 
-def new_state_and_info(position, logprior, loglikelihood, info):
-    """Create new PartitionedState and PartitionedInfo from transition results.
-
-    This utility function packages the results of a transition into the standard
-    partitioned state and info containers, maintaining the separation of logprior
-    and loglikelihood components.
-
-    Parameters
-    ----------
-    position
-        The particle positions after the transition step.
-    logprior
-        The log-prior densities at the new positions.
-    loglikelihood
-        The log-likelihood values at the new positions.
-    info
-        Additional transition-specific information from the step.
-
-    Returns
-    -------
-    tuple[PartitionedState, PartitionedInfo]
-        A tuple containing the new partitioned state and associated information.
-    """
-    new_state = PartitionedState(
-        position=position,
-        logprior=logprior,
-        loglikelihood=loglikelihood,
-    )
-    info = PartitionedInfo(
-        position=position,
-        logprior=logprior,
-        loglikelihood=loglikelihood,
-        info=info,
-    )
-    return new_state, info
-
-
 def init(
     particles: ArrayLikeTree,
     logprior_fn: Callable,
