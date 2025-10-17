@@ -248,7 +248,7 @@ def horizontal_slice(
 
 
 def build_hrss_kernel(
-    generate_slice_direction_fn: Callable[[PRNGKey], ArrayTree],
+    cov: Array,
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> Callable:
@@ -261,10 +261,8 @@ def build_hrss_kernel(
 
     Parameters
     ----------
-    generate_slice_direction_fn
-        A function that, given a PRNG key, generates a direction vector (PyTree
-        with the same structure as the position) for the "hit-and-run" part of
-        the algorithm. This direction is typically normalized.
+    cov
+        The covariance matrix used by the direction proposal function
     max_steps
         The maximum number of steps to take when expanding the interval in
         each direction during the stepping-out phase.
@@ -282,7 +280,7 @@ def build_hrss_kernel(
         rng_key: PRNGKey, state: SliceState, logdensity_fn: Callable
     ) -> tuple[SliceState, SliceInfo]:
         rng_key, prop_key = jax.random.split(rng_key, 2)
-        d = generate_slice_direction_fn(prop_key)
+        d = sample_direction_from_covariance(prop_key, cov)
 
         def slice_fn(t):
             x = jax.tree.map(lambda x, d: x + t * d, state.position, d)
@@ -356,8 +354,7 @@ def hrss_as_top_level_api(
         A `SamplingAlgorithm` tuple containing `init` and `step` functions for
         the configured Hit-and-Run Slice Sampler.
     """
-    generate_slice_direction_fn = partial(sample_direction_from_covariance, cov=cov)
-    kernel = build_hrss_kernel(generate_slice_direction_fn, max_steps, max_shrinkage)
+    kernel = build_hrss_kernel(cov, max_steps, max_shrinkage)
     init_fn = partial(init, logdensity_fn=logdensity_fn)
     step_fn = partial(kernel, logdensity_fn=logdensity_fn)
     return SamplingAlgorithm(init_fn, step_fn)
