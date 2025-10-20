@@ -325,7 +325,7 @@ def sample_direction_from_covariance(
     p, unravel_fn = jax.flatten_util.ravel_pytree(position)
     u = jax.random.normal(rng_key, shape=p.shape, dtype=p.dtype)
     u /= jnp.linalg.norm(u)
-    L = jnp.linalg.cholesky(cov)
+    L = jnp.linalg.cholesky(cov).astype(p.dtype)
     d = L @ u
     return unravel_fn(d)
 
