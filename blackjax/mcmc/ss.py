@@ -33,8 +33,8 @@ import jax
 import jax.numpy as jnp
 
 from blackjax.base import SamplingAlgorithm
-from blackjax.mcmc.proposal import static_binomial_sampling
 from blackjax.types import Array, ArrayLikeTree, ArrayTree, PRNGKey
+from blackjax.util import linear_map
 
 __all__ = [
     "SliceState",
@@ -140,7 +140,8 @@ def build_kernel(
         state: SliceState,
     ) -> tuple[SliceState, SliceInfo]:
         vs_key, hs_key = jax.random.split(rng_key)
-        logslice = state.logdensity + jnp.log(jax.random.uniform(vs_key))
+        u = jax.random.uniform(vs_key)
+        logslice = state.logdensity + jnp.log(u)
         vertical_is_accepted = logslice < state.logdensity
 
         def _slice_fn(t):
@@ -198,7 +199,7 @@ def horizontal_slice(
     # Initial bounds
     rng_key, subkey = jax.random.split(rng_key)
     u, v = jax.random.uniform(subkey, 2)
-    j = jnp.floor(m * v).astype(int)
+    j = jnp.floor(m * v).astype(jnp.int32)
     k = (m - 1) - j
 
     # Expand
@@ -240,15 +241,15 @@ def horizontal_slice(
     carry = 0, rng_key, l, r, state, False
     carry = jax.lax.while_loop(shrink_cond_fun, shrink_body_fun, carry)
     n, _, _, _, new_state, is_accepted = carry
-    new_state, (is_accepted, _, _) = static_binomial_sampling(
-        rng_key, jnp.log(is_accepted), state, new_state
+    new_state = jax.tree.map(
+        lambda new, old: jnp.where(is_accepted, new, old), new_state, state
     )
     slice_info = SliceInfo(is_accepted, m + 1 - j - k, n)
     return new_state, slice_info
 
 
 def build_hrss_kernel(
-    generate_slice_direction_fn: Callable[[PRNGKey], ArrayTree],
+    generate_slice_direction_fn: Callable[[PRNGKey, ArrayLikeTree], Array],
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> Callable:
@@ -282,7 +283,7 @@ def build_hrss_kernel(
         rng_key: PRNGKey, state: SliceState, logdensity_fn: Callable
     ) -> tuple[SliceState, SliceInfo]:
         rng_key, prop_key = jax.random.split(rng_key, 2)
-        d = generate_slice_direction_fn(prop_key)
+        d = generate_slice_direction_fn(prop_key, state.position)
 
         def slice_fn(t):
             x = jax.tree.map(lambda x, d: x + t * d, state.position, d)
@@ -296,32 +297,47 @@ def build_hrss_kernel(
     return kernel
 
 
-def sample_direction_from_covariance(rng_key: PRNGKey, cov: Array) -> Array:
+def sample_direction_from_covariance(
+    rng_key: PRNGKey, position: ArrayLikeTree, cov: Array
+) -> Array:
     """Generates a random direction vector, normalized, from a multivariate Gaussian.
 
-    This function samples a direction `d` from a zero-mean multivariate Gaussian
-    distribution with covariance matrix `cov`, and then normalizes `d` to be a
-    unit vector with respect to the Mahalanobis norm defined by `inv(cov)`.
-    That is, `d_normalized^T @ inv(cov) @ d_normalized = 1`.
+    This function generates a direction vector uniformly distributed on a hypersphere
+    by using the mathematical simplification:
+    1. Sample from standard multivariate normal N(0, I)
+    2. Normalize to unit vector (uniform on hypersphere)
+    3. Transform by S^(1/2) where S is the covariance matrix
+    4. Scale by 2*sqrt(d+2) to optimize for slice sampling
+
+    This is equivalent to sampling from N(0, S) and normalizing by Mahalanobis norm
+    but is more numerically stable and efficient.
+
+    The scaling factor 2*sqrt(d+2) corrects for two effects:
+    - Factor sqrt(d+2): Empirical covariance of uniform d-ball has Σ = R²/(d+2) I,
+      underestimating spatial extent by (d+2)
+    - Factor 2: Initial slice interval should span diameter (2R) not radius (R)
 
     Parameters
     ----------
     rng_key
         A JAX PRNG key.
+    position
+        The current position of the chain (used for extracting shape).
     cov
-        The covariance matrix for the multivariate Gaussian distribution from which
-        the initial direction is sampled. Assumed to be a 2D array.
-
+        The covariance matrix.
     Returns
     -------
     Array
         A normalized direction vector (1D array).
     """
-    d = jax.random.multivariate_normal(rng_key, mean=jnp.zeros(cov.shape[0]), cov=cov)
-    invcov = jnp.linalg.inv(cov)
-    norm = jnp.sqrt(jnp.einsum("...i,...ij,...j", d, invcov, d))
-    d = d / norm[..., None]
-    return d
+    p, unravel_fn = jax.flatten_util.ravel_pytree(position)
+    u = jax.random.normal(rng_key, shape=p.shape, dtype=p.dtype)
+    u /= jnp.linalg.norm(u)
+    L = jnp.linalg.cholesky(cov).astype(p.dtype)
+    dim = cov.shape[0]
+    L = L * 2 * jnp.sqrt(dim + 2)
+    d = linear_map(L, u)
+    return unravel_fn(d)
 
 
 def hrss_as_top_level_api(
