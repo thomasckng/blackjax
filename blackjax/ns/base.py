@@ -344,7 +344,7 @@ def build_kernel(
             new_inner_state.loglikelihood
         )
         loglikelihood_birth = state.loglikelihood_birth.at[target_update_idx].set(
-            loglikelihood_0 * jnp.ones(len(target_update_idx), dtype=state.loglikelihood.dtype)
+            loglikelihood_0
         )
         logprior = state.logprior.at[target_update_idx].set(new_inner_state.logprior)
         pid = state.pid.at[target_update_idx].set(state.pid[start_idx])
@@ -433,7 +433,7 @@ def update_ns_runtime_info(
     num_particles = len(loglikelihood)
     num_deleted = len(dead_loglikelihood)
     num_live = jnp.arange(num_particles, num_particles - num_deleted, -1, dtype=loglikelihood.dtype)
-    delta_logX = jnp.array(-1, dtype=loglikelihood.dtype) / num_live
+    delta_logX = -1 / num_live
     logX = logX + jnp.cumsum(delta_logX)
     log_delta_X = logX + jnp.log(1 - jnp.exp(delta_logX))
     log_delta_Z = dead_loglikelihood + log_delta_X

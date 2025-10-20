@@ -34,7 +34,6 @@ import jax.numpy as jnp
 from jax.flatten_util import ravel_pytree
 
 from blackjax.base import SamplingAlgorithm
-from blackjax.mcmc.proposal import static_binomial_sampling
 from blackjax.types import Array, ArrayLikeTree, ArrayTree, PRNGKey
 
 __all__ = [
@@ -242,9 +241,9 @@ def horizontal_slice(
     carry = 0, rng_key, l, r, state, False
     carry = jax.lax.while_loop(shrink_cond_fun, shrink_body_fun, carry)
     n, _, _, _, new_state, is_accepted = carry
-    log_accepted = jnp.log(jnp.array(is_accepted, dtype=state.logdensity.dtype))
-    new_state, (is_accepted, _, _) = static_binomial_sampling(
-        rng_key, log_accepted, state, new_state
+    new_state = jax.tree.map(
+        lambda new, old: jnp.where(is_accepted, new, old),
+        new_state, state
     )
     slice_info = SliceInfo(is_accepted, m + 1 - j - k, n)
     return new_state, slice_info
