@@ -89,24 +89,8 @@ def compute_covariance_from_particles(
     info: NSInfo,
     inner_kernel_params: Optional[Dict[str, ArrayTree]] = None,
 ) -> Dict[str, ArrayTree]:
-    """Default function to adapt/tune the slice direction proposal parameters.
-    uses the empirical particle covariance directly
-
-    Parameters
-    ----------
-    state
-        The current `NSState` of the Nested Sampler, containing the live particles.
-    info
-        The `NSInfo` from the last Nested Sampling step.
-    inner_kernel_params
-        A dictionary of parameters for the inner kernel.
-
-    Returns
-    -------
-    Dict[str, ArrayTree]
-    """
-    cov_matrix = jnp.atleast_2d(particles_covariance_matrix(state.particles))
-    return {"cov": cov_matrix}
+    """Compute empirical covariance from current particles for direction proposal."""
+    return {"cov": jnp.atleast_2d(particles_covariance_matrix(state.particles))}
 
 
 def build_kernel(
@@ -210,9 +194,9 @@ def as_top_level_api(
         the parameters (e.g., covariance matrix) for the slice direction proposal,
         based on the current NS state. Defaults to `compute_covariance_from_particles`.
     generate_slice_direction_fn
-        A function `(rng_key, position, **params) -> direction_pytree` that generates a
-        normalized direction for HRSS, using parameters from `adapt_direction_params_fn`.
-        Defaults to `sample_direction_from_covariance`.
+        A function `(rng_key, position, **kwargs) -> direction_pytree` that generates a
+        normalized direction for HRSS. Keyword arguments are unpacked from the dict
+        returned by `adapt_direction_params_fn`. Defaults to `sample_direction_from_covariance`.
     max_steps
         The maximum number of steps to take when expanding the interval in
         each direction during the stepping-out phase. Defaults to 10.

@@ -307,9 +307,15 @@ def sample_direction_from_covariance(
     1. Sample from standard multivariate normal N(0, I)
     2. Normalize to unit vector (uniform on hypersphere)
     3. Transform by S^(1/2) where S is the covariance matrix
+    4. Scale by 2*sqrt(d+2) to optimize for slice sampling
 
     This is equivalent to sampling from N(0, S) and normalizing by Mahalanobis norm
     but is more numerically stable and efficient.
+
+    The scaling factor 2*sqrt(d+2) corrects for two effects:
+    - Factor sqrt(d+2): Empirical covariance of uniform d-ball has Σ = R²/(d+2) I,
+      underestimating spatial extent by (d+2)
+    - Factor 2: Initial slice interval should span diameter (2R) not radius (R)
 
     Parameters
     ----------
@@ -328,6 +334,8 @@ def sample_direction_from_covariance(
     u = jax.random.normal(rng_key, shape=p.shape, dtype=p.dtype)
     u /= jnp.linalg.norm(u)
     L = jnp.linalg.cholesky(cov).astype(p.dtype)
+    dim = cov.shape[0]
+    L = L * 2 * jnp.sqrt(dim + 2)
     d = linear_map(L, u)
     return unravel_fn(d)
 
