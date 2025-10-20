@@ -31,7 +31,6 @@ from typing import Callable, NamedTuple
 
 import jax
 import jax.numpy as jnp
-from jax.flatten_util import ravel_pytree
 
 from blackjax.base import SamplingAlgorithm
 from blackjax.types import Array, ArrayLikeTree, ArrayTree, PRNGKey
@@ -323,11 +322,11 @@ def sample_direction_from_covariance(
     Array
         A normalized direction vector (1D array).
     """
-    p, unravel_fn = ravel_pytree(position)
-    d = jax.random.normal(rng_key, shape=p.shape, dtype=p.dtype)
-    invcov = jnp.linalg.inv(cov)
-    norm = jnp.sqrt(jnp.einsum("...i,...ij,...j", d, invcov, d))
-    d = d / norm[..., None]
+    p, unravel_fn = jax.flatten_util.ravel_pytree(position)
+    u = jax.random.normal(rng_key, shape=p.shape, dtype=p.dtype)
+    u /= jnp.linalg.norm(u)
+    L = jnp.linalg.cholesky(cov)
+    d = L @ u
     return unravel_fn(d)
 
 
