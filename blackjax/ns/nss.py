@@ -55,11 +55,11 @@ __all__ = [
 ]
 
 
-class PartitionedSliceState(NamedTuple):
+class SliceStateWithLoglikelihood(NamedTuple):
     """State used internally by nested slice sampling.
 
-    This extends the basic SliceState to track both the log-prior (logdensity)
-    and log-likelihood values needed for the likelihood contour constraint.
+    This extends the basic SliceState to track both the log-likelihood value
+    needed for the likelihood contour constraint.
 
     Attributes
     ----------
@@ -77,6 +77,24 @@ class PartitionedSliceState(NamedTuple):
 
 
 class NSSInfo(NamedTuple):
+    """Additional information from the Nested Slice Sampling transition.
+
+    Attributes
+    ----------
+    position
+        The position(s) resulting from the slice sampling step.
+    logprior
+        The log-prior value(s) at the position(s).
+    loglikelihood
+        The log-likelihood value(s) at the position(s).
+    is_accepted
+        Whether the slice sampling proposal was accepted.
+    num_steps
+        The number of steps taken during the stepping-out phase.
+    num_shrink
+        The number of shrinking steps taken during the shrinking phase.
+    """
+
     position: ArrayTree
     logprior: ArrayTree
     loglikelihood: ArrayTree
@@ -85,7 +103,7 @@ class NSSInfo(NamedTuple):
     num_shrink: int
 
 
-def default_stepper_fn(x: ArrayTree, d: ArrayTree, t: float) -> ArrayTree:
+def default_stepper_fn(x: ArrayTree, d: ArrayTree, t: float) -> tuple[ArrayTree, bool]:
     """A simple stepper function that moves from `x` along direction `d` by `t` units.
 
     Implements the operation: `x_new = x + t * d`.
@@ -101,7 +119,8 @@ def default_stepper_fn(x: ArrayTree, d: ArrayTree, t: float) -> ArrayTree:
 
     Returns
     -------
-    position, is_accepted
+    tuple[ArrayTree, bool]
+        A tuple containing the new position and whether the step was accepted.
     """
     return jax.tree.map(lambda x, d: x + t * d, x, d), True
 
@@ -253,9 +272,9 @@ def build_kernel(
         rng_key, prop_key = jax.random.split(rng_key, 2)
         d = generate_slice_direction_fn(prop_key, params)
 
-        def slice_fn(t) -> tuple[PartitionedSliceState, SliceInfo]:
+        def slice_fn(t) -> tuple[SliceStateWithLoglikelihood, bool]:
             x, step_accepted = stepper_fn(state.position, d, t)
-            new_state = PartitionedSliceState(
+            new_state = SliceStateWithLoglikelihood(
                 position=x,
                 logdensity=logprior_fn(x),
                 loglikelihood=loglikelihood_fn(x),
@@ -264,7 +283,7 @@ def build_kernel(
             is_accepted = in_contour & step_accepted
             return new_state, is_accepted
 
-        slice_state = PartitionedSliceState(
+        slice_state = SliceStateWithLoglikelihood(
             position=state.position,
             logdensity=state.logprior,
             loglikelihood=state.loglikelihood,
