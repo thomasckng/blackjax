@@ -47,7 +47,7 @@ class SliceSamplingTest(chex.TestCase):
         position = jnp.zeros(ndim)
 
         # Build kernel with normalized random direction
-        def direction_fn(rng_key):
+        def direction_fn(rng_key, pos):
             d = jax.random.normal(rng_key, (ndim,))
             return d / jnp.linalg.norm(d)
 
@@ -104,9 +104,10 @@ class SliceSamplingTest(chex.TestCase):
     def test_default_direction_generation(self):
         """Test default direction generation function"""
         key = jax.random.key(101112)
+        position = jnp.zeros(3)
         cov = jnp.eye(3) * 2.0
 
-        direction = ss.sample_direction_from_covariance(key, cov)
+        direction = ss.sample_direction_from_covariance(key, position, cov)
 
         chex.assert_shape(direction, (3,))
 

@@ -28,25 +28,19 @@ from typing import Callable, Dict, NamedTuple, Optional
 
 import jax
 import jax.numpy as jnp
-from jax.flatten_util import ravel_pytree
 
 from blackjax import SamplingAlgorithm
 from blackjax.mcmc.ss import SliceInfo
 from blackjax.mcmc.ss import build_kernel as build_slice_kernel
-from blackjax.mcmc.ss import (
-    sample_direction_from_covariance as ss_sample_direction_from_covariance,
-)
+from blackjax.mcmc.ss import sample_direction_from_covariance
 from blackjax.ns.adaptive import build_kernel as build_adaptive_kernel
 from blackjax.ns.adaptive import init
 from blackjax.ns.base import NSInfo, NSState
 from blackjax.ns.base import delete_fn as default_delete_fn
 from blackjax.ns.base import new_state_and_info
-from blackjax.ns.utils import get_first_row, repeat_kernel
-from blackjax.smc.tuning.from_particles import (
-    particles_as_rows,
-    particles_covariance_matrix,
-)
-from blackjax.types import Array, ArrayLikeTree, ArrayTree, PRNGKey
+from blackjax.ns.utils import repeat_kernel
+from blackjax.smc.tuning.from_particles import particles_covariance_matrix
+from blackjax.types import Array, ArrayLikeTree, ArrayTree
 
 __all__ = [
     "init",
@@ -97,52 +91,6 @@ def default_stepper_fn(x: ArrayTree, d: ArrayTree, t: float) -> ArrayTree:
     return jax.tree.map(lambda x, d: x + t * d, x, d), True
 
 
-def sample_direction_from_covariance(
-    rng_key: PRNGKey, params: Dict[str, ArrayTree]
-) -> ArrayTree:
-    """Default function to generate a normalized slice direction for NSS.
-
-    This function is designed to work with covariance parameters adapted by
-    `default_adapt_direction_params_fn`. It expects `params` to contain
-    'cov', a PyTree structured identically to a single particle. Each leaf
-    of this 'cov' PyTree contains rows of the full covariance matrix that
-    correspond to that leaf's elements in the flattened particle vector.
-    (Specifically, if the full DxD covariance matrix of flattened particles is
-    `M_flat`, and `unravel_fn` un-flattens a D-vector to the particle PyTree,
-    then the input `cov` is effectively `jax.vmap(unravel_fn)(M_flat)`).
-
-    The function reassembles the full (D,D) covariance matrix from this
-    PyTree structure. It then samples a flat direction vector `d_flat` from
-    a multivariate Gaussian $\\mathcal{N}(0, M_{reassembled})$, normalizes
-    `d_flat` using the Mahalanobis norm defined by $M_{reassembled}^{-1}$,
-    and finally un-flattens this normalized direction back into the
-    particle's PyTree structure using an `unravel_fn` derived from the
-    particle structure.
-
-    Parameters
-    ----------
-    rng_key
-        A JAX PRNG key.
-    params
-        Keyword arguments, must contain:
-        - `cov`: A PyTree (structured like a particle) whose leaves are rows
-                 of the covariance matrix, typically output by
-                 `compute_covariance_from_particles`.
-
-    Returns
-    -------
-    ArrayTree
-        A Mahalanobis-normalized direction vector (PyTree, matching the
-        structure of a single particle), to be used by the slice sampler.
-    """
-    cov = params["cov"]
-    row = get_first_row(cov)
-    _, unravel_fn = ravel_pytree(row)
-    cov = particles_as_rows(cov)
-    d = ss_sample_direction_from_covariance(rng_key, cov)
-    return unravel_fn(d)
-
-
 def compute_covariance_from_particles(
     state: NSState,
     info: NSInfo,
@@ -175,10 +123,7 @@ def compute_covariance_from_particles(
         This means each leaf of `cov_pytree` will have a shape `(D, *leaf_original_dims)`.
     """
     cov_matrix = jnp.atleast_2d(particles_covariance_matrix(state.particles))
-    single_particle = get_first_row(state.particles)
-    _, unravel_fn = ravel_pytree(single_particle)
-    cov_pytree = jax.vmap(unravel_fn)(cov_matrix)
-    return {"cov": cov_pytree}
+    return {"cov": cov_matrix}
 
 
 def build_kernel(
@@ -242,7 +187,7 @@ def build_kernel(
         rng_key, state, logprior_fn, loglikelihood_fn, loglikelihood_0, params
     ):
         rng_key, prop_key = jax.random.split(rng_key, 2)
-        d = generate_slice_direction_fn(prop_key, params)
+        d = generate_slice_direction_fn(prop_key, state.position, params["cov"])
 
         def slice_fn(t) -> tuple[PartitionedSliceState, SliceInfo]:
             x, step_accepted = stepper_fn(state.position, d, t)

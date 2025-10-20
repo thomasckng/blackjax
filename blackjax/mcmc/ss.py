@@ -31,6 +31,7 @@ from typing import Callable, NamedTuple
 
 import jax
 import jax.numpy as jnp
+from jax.flatten_util import ravel_pytree
 
 from blackjax.base import SamplingAlgorithm
 from blackjax.mcmc.proposal import static_binomial_sampling
@@ -248,7 +249,7 @@ def horizontal_slice(
 
 
 def build_hrss_kernel(
-    generate_slice_direction_fn: Callable[[PRNGKey], ArrayTree],
+    generate_slice_direction_fn: Callable[[PRNGKey, ArrayLikeTree], Array],
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> Callable:
@@ -282,7 +283,7 @@ def build_hrss_kernel(
         rng_key: PRNGKey, state: SliceState, logdensity_fn: Callable
     ) -> tuple[SliceState, SliceInfo]:
         rng_key, prop_key = jax.random.split(rng_key, 2)
-        d = generate_slice_direction_fn(prop_key)
+        d = generate_slice_direction_fn(prop_key, state.position)
 
         def slice_fn(t):
             x = jax.tree.map(lambda x, d: x + t * d, state.position, d)
@@ -296,7 +297,9 @@ def build_hrss_kernel(
     return kernel
 
 
-def sample_direction_from_covariance(rng_key: PRNGKey, cov: Array) -> Array:
+def sample_direction_from_covariance(
+    rng_key: PRNGKey, position: ArrayLikeTree, cov: Array
+) -> Array:
     """Generates a random direction vector, normalized, from a multivariate Gaussian.
 
     This function samples a direction `d` from a zero-mean multivariate Gaussian
@@ -308,6 +311,8 @@ def sample_direction_from_covariance(rng_key: PRNGKey, cov: Array) -> Array:
     ----------
     rng_key
         A JAX PRNG key.
+    position
+        The current position of the chain (used for extracting shape).
     cov
         The covariance matrix for the multivariate Gaussian distribution from which
         the initial direction is sampled. Assumed to be a 2D array.
@@ -317,11 +322,12 @@ def sample_direction_from_covariance(rng_key: PRNGKey, cov: Array) -> Array:
     Array
         A normalized direction vector (1D array).
     """
-    d = jax.random.multivariate_normal(rng_key, mean=jnp.zeros(cov.shape[0]), cov=cov)
+    p, unravel_fn = ravel_pytree(position)
+    d = jax.random.normal(rng_key, shape=p.shape, dtype=p.dtype)
     invcov = jnp.linalg.inv(cov)
     norm = jnp.sqrt(jnp.einsum("...i,...ij,...j", d, invcov, d))
     d = d / norm[..., None]
-    return d
+    return unravel_fn(d)
 
 
 def hrss_as_top_level_api(
