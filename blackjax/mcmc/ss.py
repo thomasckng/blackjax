@@ -141,7 +141,8 @@ def build_kernel(
         state: SliceState,
     ) -> tuple[SliceState, SliceInfo]:
         vs_key, hs_key = jax.random.split(rng_key)
-        logslice = state.logdensity + jnp.log(jax.random.uniform(vs_key))
+        u = jax.random.uniform(vs_key, dtype=state.logdensity.dtype)
+        logslice = state.logdensity + jnp.log(u)
         vertical_is_accepted = logslice < state.logdensity
 
         def _slice_fn(t):
@@ -198,8 +199,8 @@ def horizontal_slice(
     """
     # Initial bounds
     rng_key, subkey = jax.random.split(rng_key)
-    u, v = jax.random.uniform(subkey, 2)
-    j = jnp.floor(m * v).astype(int)
+    u, v = jax.random.uniform(subkey, 2, dtype=state.logdensity.dtype)
+    j = jnp.floor(m * v).astype(jnp.int32)
     k = (m - 1) - j
 
     # Expand
@@ -241,8 +242,9 @@ def horizontal_slice(
     carry = 0, rng_key, l, r, state, False
     carry = jax.lax.while_loop(shrink_cond_fun, shrink_body_fun, carry)
     n, _, _, _, new_state, is_accepted = carry
+    log_accepted = jnp.log(jnp.array(is_accepted, dtype=state.logdensity.dtype))
     new_state, (is_accepted, _, _) = static_binomial_sampling(
-        rng_key, jnp.log(is_accepted), state, new_state
+        rng_key, log_accepted, state, new_state
     )
     slice_info = SliceInfo(is_accepted, m + 1 - j - k, n)
     return new_state, slice_info

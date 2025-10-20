@@ -239,7 +239,7 @@ def init(
     loglikelihood = loglikelihood_fn(particles)
     loglikelihood_birth = loglikelihood_birth * jnp.ones_like(loglikelihood)
     logprior = logprior_fn(particles)
-    pid = jnp.arange(len(loglikelihood))
+    pid = jnp.arange(len(loglikelihood), dtype=jnp.int32)
     dtype = loglikelihood.dtype
     logX = jnp.array(logX, dtype=dtype)
     logZ = jnp.array(logZ, dtype=dtype)
@@ -344,7 +344,7 @@ def build_kernel(
             new_inner_state.loglikelihood
         )
         loglikelihood_birth = state.loglikelihood_birth.at[target_update_idx].set(
-            loglikelihood_0 * jnp.ones(len(target_update_idx))
+            loglikelihood_0 * jnp.ones(len(target_update_idx), dtype=state.loglikelihood.dtype)
         )
         logprior = state.logprior.at[target_update_idx].set(new_inner_state.logprior)
         pid = state.pid.at[target_update_idx].set(state.pid[start_idx])
@@ -414,7 +414,7 @@ def delete_fn(
     loglikelihood = state.loglikelihood
     neg_dead_loglikelihood, dead_idx = jax.lax.top_k(-loglikelihood, num_delete)
     constraint_loglikelihood = loglikelihood > -neg_dead_loglikelihood.min()
-    weights = jnp.array(constraint_loglikelihood, dtype=jnp.float32)
+    weights = jnp.array(constraint_loglikelihood, dtype=loglikelihood.dtype)
     weights = jnp.where(weights.sum() > 0.0, weights, jnp.ones_like(weights))
     start_idx = jax.random.choice(
         rng_key,
@@ -432,8 +432,8 @@ def update_ns_runtime_info(
 ) -> tuple[Array, Array, Array]:
     num_particles = len(loglikelihood)
     num_deleted = len(dead_loglikelihood)
-    num_live = jnp.arange(num_particles, num_particles - num_deleted, -1)
-    delta_logX = -1 / num_live
+    num_live = jnp.arange(num_particles, num_particles - num_deleted, -1, dtype=loglikelihood.dtype)
+    delta_logX = jnp.array(-1, dtype=loglikelihood.dtype) / num_live
     logX = logX + jnp.cumsum(delta_logX)
     log_delta_X = logX + jnp.log(1 - jnp.exp(delta_logX))
     log_delta_Z = dead_loglikelihood + log_delta_X
@@ -445,4 +445,5 @@ def update_ns_runtime_info(
 
 
 def logmeanexp(x: Array) -> Array:
-    return logsumexp(x) - jnp.log(len(x))
+    n = jnp.array(x.shape[0], dtype=x.dtype)
+    return logsumexp(x) - jnp.log(n)
