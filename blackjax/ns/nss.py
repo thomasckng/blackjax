@@ -164,7 +164,7 @@ def build_kernel(
         the parameters (e.g., covariance matrix) for the slice direction proposal,
         based on the current NS state. Defaults to `compute_covariance_from_particles`.
     generate_slice_direction_fn
-        A function `(rng_key, **params) -> direction_pytree` that generates a
+        A function `(rng_key, position, **params) -> direction_pytree` that generates a
         normalized direction for HRSS, using parameters from `adapt_direction_params_fn`.
         Defaults to `sample_direction_from_covariance`.
     max_steps
@@ -187,7 +187,7 @@ def build_kernel(
         rng_key, state, logprior_fn, loglikelihood_fn, loglikelihood_0, params
     ):
         rng_key, prop_key = jax.random.split(rng_key, 2)
-        d = generate_slice_direction_fn(prop_key, state.position, params["cov"])
+        d = generate_slice_direction_fn(prop_key, state.position, **params)
 
         def slice_fn(t) -> tuple[PartitionedSliceState, SliceInfo]:
             x, step_accepted = stepper_fn(state.position, d, t)
@@ -267,7 +267,7 @@ def as_top_level_api(
         the parameters (e.g., covariance matrix) for the slice direction proposal,
         based on the current NS state. Defaults to `compute_covariance_from_particles`.
     generate_slice_direction_fn
-        A function `(rng_key, **params) -> direction_pytree` that generates a
+        A function `(rng_key, position, **params) -> direction_pytree` that generates a
         normalized direction for HRSS, using parameters from `adapt_direction_params_fn`.
         Defaults to `sample_direction_from_covariance`.
     max_steps
