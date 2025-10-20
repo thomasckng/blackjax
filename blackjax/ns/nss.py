@@ -234,7 +234,7 @@ def as_top_level_api(
         the parameters (e.g., covariance matrix) for the slice direction proposal,
         based on the current NS state. Defaults to `compute_covariance_from_particles`.
     generate_slice_direction_fn
-        A function `(rng_key, position, **kwargs) -> direction_pytree` that generates a
+        A function `(rng_key, **kwargs) -> direction_pytree` that generates a
         normalized direction for HRSS. Keyword arguments are unpacked from the dict
         returned by `adapt_direction_params_fn`. Defaults to `sample_direction_from_covariance`.
     max_steps
