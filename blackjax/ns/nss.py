@@ -31,7 +31,7 @@ from blackjax.ns.adaptive import init
 from blackjax.ns.base import NSInfo, NSState
 from blackjax.ns.base import delete_fn as default_delete_fn
 from blackjax.ns.base import PartitionedState
-from blackjax.ns.utils import repeat_kernel
+from blackjax.ns.utils import get_first_row, repeat_kernel
 from blackjax.smc.tuning.from_particles import particles_covariance_matrix
 from blackjax.types import Array, ArrayLikeTree, ArrayTree
 
@@ -118,7 +118,10 @@ def compute_covariance_from_particles(
     inner_kernel_params: Optional[Dict[str, ArrayTree]] = None,
 ) -> Dict[str, ArrayTree]:
     """Compute empirical covariance from current particles for direction proposal."""
-    return {"cov": jnp.atleast_2d(particles_covariance_matrix(state.particles))}
+    return {
+        "cov": jnp.atleast_2d(particles_covariance_matrix(state.particles)),
+        "position": get_first_row(state.particles),
+    }
 
 
 def build_kernel(
@@ -142,7 +145,7 @@ def build_kernel(
         rng_key, state, logprior_fn, loglikelihood_fn, loglikelihood_0, params
     ):
         rng_key, prop_key = jax.random.split(rng_key, 2)
-        d = generate_slice_direction_fn(prop_key, state.position, **params)
+        d = generate_slice_direction_fn(prop_key, **params)
 
         def slice_fn(t) -> tuple[SliceStateWithLoglikelihood, bool]:
             x, step_accepted = stepper_fn(state.position, d, t)
