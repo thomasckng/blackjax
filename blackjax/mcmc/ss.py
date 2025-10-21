@@ -33,8 +33,8 @@ import jax
 import jax.numpy as jnp
 
 from blackjax.base import SamplingAlgorithm
-from blackjax.mcmc.proposal import static_binomial_sampling
 from blackjax.types import Array, ArrayLikeTree, ArrayTree, PRNGKey
+from blackjax.util import linear_map
 
 __all__ = [
     "SliceState",
@@ -59,7 +59,6 @@ class SliceState(NamedTuple):
 
     position: ArrayLikeTree
     logdensity: float
-    constraint: Array
 
 
 class SliceInfo(NamedTuple):
@@ -72,8 +71,6 @@ class SliceInfo(NamedTuple):
     ----------
     is_accepted
         A boolean indicating whether the proposed sample was accepted.
-    constraint
-        The constraint values at the final accepted position.
     num_steps
         The number of steps taken to expand the interval during the "stepping-out" phase.
     num_shrink
@@ -86,9 +83,7 @@ class SliceInfo(NamedTuple):
     num_shrink: int
 
 
-def init(
-    position: ArrayTree, logdensity_fn: Callable, constraint_fn: Callable
-) -> SliceState:
+def init(position: ArrayTree, logdensity_fn: Callable) -> SliceState:
     """Initialize the Slice Sampler state.
 
     Parameters
@@ -103,12 +98,11 @@ def init(
     SliceState
         The initial state of the Slice Sampler.
     """
-    return SliceState(position, logdensity_fn(position), constraint_fn(position))
+    return SliceState(position, logdensity_fn(position))
 
 
 def build_kernel(
-    stepper_fn: Callable,
-    init_fn: Callable = init,
+    slice_fn: Callable[[float], tuple[SliceState, bool]],
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> Callable:
@@ -120,17 +114,21 @@ def build_kernel(
 
     Parameters
     ----------
-    stepper_fn
-        A function that computes a new position given an initial position,
-        direction `d` and a slice parameter `t`.
-        `(x0, d, t) -> x_new` where e.g. `x_new = x0 + t * d`.
+    slice_fn
+        A function that takes a scalar parameter `t` and returns a tuple
+        (SliceState, is_accepted) indicating the state at that parameter value
+        and whether it satisfies acceptance criteria.
+    max_steps
+        The maximum number of steps to take when expanding the interval in
+        each direction during the stepping-out phase.
+    max_shrinkage
+        The maximum number of shrinking steps to perform to avoid infinite loops.
 
     Returns
     -------
     Callable
-        A kernel function that takes a PRNG key, the current `SliceState`,
-        the log-density function, direction `d`, constraint function, constraint
-        values, and strict flags, and returns a new `SliceState` and `SliceInfo`.
+        A kernel function that takes a PRNG key and the current `SliceState`,
+        and returns a new `SliceState` and `SliceInfo`.
 
     References
     ----------
@@ -140,32 +138,19 @@ def build_kernel(
     def kernel(
         rng_key: PRNGKey,
         state: SliceState,
-        logdensity_fn: Callable,
-        d: ArrayTree,
-        constraint_fn: Callable,
-        constraint: Array,
-        strict: Array,
     ) -> tuple[SliceState, SliceInfo]:
         vs_key, hs_key = jax.random.split(rng_key)
-        logslice = state.logdensity + jnp.log(jax.random.uniform(vs_key))
+        u = jax.random.uniform(vs_key)
+        logslice = state.logdensity + jnp.log(u)
         vertical_is_accepted = logslice < state.logdensity
 
-        def slicer(t) -> tuple[SliceState, SliceInfo]:
-            x, step_accepted = stepper_fn(state.position, d, t)
-            new_state = init_fn(x, logdensity_fn, constraint_fn)
-            constraints_ok = jnp.all(
-                jnp.where(
-                    strict,
-                    new_state.constraint > constraint,
-                    new_state.constraint >= constraint,
-                )
-            )
+        def _slice_fn(t):
+            new_state, is_accepted = slice_fn(t)
             in_slice = new_state.logdensity >= logslice
-            is_accepted = in_slice & constraints_ok & step_accepted
-            return new_state, is_accepted
+            return new_state, is_accepted & in_slice
 
         new_state, info = horizontal_slice(
-            hs_key, slicer, state, max_steps, max_shrinkage
+            hs_key, state, _slice_fn, max_steps, max_shrinkage
         )
         info = info._replace(is_accepted=info.is_accepted & vertical_is_accepted)
         return new_state, info
@@ -175,29 +160,29 @@ def build_kernel(
 
 def horizontal_slice(
     rng_key: PRNGKey,
-    slicer: Callable,
     state: SliceState,
+    slice_fn: Callable[[float], tuple[SliceState, bool]],
     m: int,
     max_shrinkage: int,
 ) -> tuple[SliceState, SliceInfo]:
     """Propose a new sample using the stepping-out and shrinking procedures.
 
     This function implements the core of the Hit-and-Run Slice Sampling algorithm.
-    It first expands an interval (`[l, r]`) along the slice starting
-    from `x0` and proceeding along direction `d` until both ends are outside
-    the slice defined by `logslice` (stepping-out). Then, it samples
-    points uniformly from this interval and shrinks the interval until a point
-    is found that lies within the slice (shrinking).
+    It first expands an interval (`[l, r]`) along a one-dimensional parameterization
+    until both ends are outside the slice defined by `logslice` (stepping-out).
+    Then, it samples points uniformly from this interval and shrinks the interval
+    until a point is found that lies within the slice (shrinking).
 
     Parameters
     ----------
     rng_key
         A JAX PRNG key.
-    slicer
-        A function that takes a scalar `t` and returns a state and info on the
-        slice.
     state
         The current slice sampling state.
+    slice_fn
+        A function that takes a scalar parameter `t` and returns a tuple
+        (SliceState, is_accepted) indicating the state at that parameter value
+        and whether it satisfies acceptance criteria.
     m
         The maximum number of steps to take when expanding the interval in
         each direction during the stepping-out phase.
@@ -214,14 +199,14 @@ def horizontal_slice(
     # Initial bounds
     rng_key, subkey = jax.random.split(rng_key)
     u, v = jax.random.uniform(subkey, 2)
-    j = jnp.floor(m * v).astype(int)
+    j = jnp.floor(m * v).astype(jnp.int32)
     k = (m - 1) - j
 
     # Expand
     def step_body_fun(carry):
         i, s, t, _ = carry
         t += s
-        _, is_accepted = slicer(t)
+        _, is_accepted = slice_fn(t)
         i -= 1
         return i, s, t, is_accepted
 
@@ -241,7 +226,7 @@ def horizontal_slice(
         rng_key, subkey = jax.random.split(rng_key)
         u = jax.random.uniform(subkey, minval=l, maxval=r)
 
-        new_state, is_accepted = slicer(u)
+        new_state, is_accepted = slice_fn(u)
         n += 1
 
         l = jnp.where(u < 0, u, l)
@@ -256,18 +241,18 @@ def horizontal_slice(
     carry = 0, rng_key, l, r, state, False
     carry = jax.lax.while_loop(shrink_cond_fun, shrink_body_fun, carry)
     n, _, _, _, new_state, is_accepted = carry
-    new_state, (is_accepted, _, _) = static_binomial_sampling(
-        rng_key, jnp.log(is_accepted), state, new_state
+    new_state = jax.tree.map(
+        lambda new, old: jnp.where(is_accepted, new, old), new_state, state
     )
     slice_info = SliceInfo(is_accepted, m + 1 - j - k, n)
     return new_state, slice_info
 
 
 def build_hrss_kernel(
-    generate_slice_direction_fn: Callable,
-    stepper_fn: Callable,
+    cov: Array,
     init_fn: Callable = init,
     max_steps: int = 10,
+    max_shrinkage: int = 100,
 ) -> Callable:
     """Build a Hit-and-Run Slice Sampling kernel.
 
@@ -278,15 +263,15 @@ def build_hrss_kernel(
 
     Parameters
     ----------
-    generate_slice_direction_fn
-        A function that, given a PRNG key, generates a direction vector (PyTree
-        with the same structure as the position) for the "hit-and-run" part of
-        the algorithm. This direction is typically normalized.
-
-    stepper_fn
-        A function that computes a new position given an initial position, a
-        direction, and a step size `t`. It should implement something analogous
-        to `x_new = x_initial + t * direction`.
+    cov
+        The covariance matrix used by the direction proposal function
+    init_fn
+        A function initializing a SliceState
+    max_steps
+        The maximum number of steps to take when expanding the interval in
+        each direction during the stepping-out phase.
+    max_shrinkage
+        The maximum number of shrinking steps to perform to avoid infinite loops.
 
     Returns
     -------
@@ -294,75 +279,74 @@ def build_hrss_kernel(
         A kernel function that takes a PRNG key, the current `SliceState`, and
         the log-density function, and returns a new `SliceState` and `SliceInfo`.
     """
-    slice_kernel = build_kernel(stepper_fn, init_fn=init_fn, max_steps=max_steps)
 
     def kernel(
         rng_key: PRNGKey, state: SliceState, logdensity_fn: Callable
     ) -> tuple[SliceState, SliceInfo]:
         rng_key, prop_key = jax.random.split(rng_key, 2)
-        d = generate_slice_direction_fn(prop_key)
-        constraint_fn = lambda x: jnp.array([])
-        constraint = jnp.array([])
-        strict = jnp.array([], dtype=bool)
-        return slice_kernel(
-            rng_key, state, logdensity_fn, d, constraint_fn, constraint, strict
-        )
+        d = sample_direction_from_covariance(prop_key, state.position, cov)
+
+        def slice_fn(t):
+            x = jax.tree.map(lambda x, d: x + t * d, state.position, d)
+            is_accepted = True
+            new_state = init_fn(x, logdensity_fn)
+            return new_state, is_accepted
+
+        slice_kernel = build_kernel(slice_fn, max_steps, max_shrinkage)
+        return slice_kernel(rng_key, state)
 
     return kernel
 
 
-def default_stepper_fn(x: ArrayTree, d: ArrayTree, t: float) -> ArrayTree:
-    """A simple stepper function that moves from `x` along direction `d` by `t` units.
-
-    Implements the operation: `x_new = x + t * d`.
-
-    Parameters
-    ----------
-    x
-        The starting position (PyTree).
-    d
-        The direction of movement (PyTree, same structure as `x`).
-    t
-        The scalar step size or distance along the direction.
-
-    Returns
-    -------
-    position, is_accepted
-    """
-    return jax.tree.map(lambda x, d: x + t * d, x, d), True
-
-
-def sample_direction_from_covariance(rng_key: PRNGKey, cov: Array) -> Array:
+def sample_direction_from_covariance(
+    rng_key: PRNGKey, position: ArrayLikeTree, cov: Array
+) -> Array:
     """Generates a random direction vector, normalized, from a multivariate Gaussian.
 
-    This function samples a direction `d` from a zero-mean multivariate Gaussian
-    distribution with covariance matrix `cov`, and then normalizes `d` to be a
-    unit vector with respect to the Mahalanobis norm defined by `inv(cov)`.
-    That is, `d_normalized^T @ inv(cov) @ d_normalized = 1`.
+    This function generates a direction vector uniformly distributed on a hypersphere
+    by using the mathematical simplification:
+    1. Sample from standard multivariate normal N(0, I)
+    2. Normalize to unit vector (uniform on hypersphere)
+    3. Transform by S^(1/2) where S is the covariance matrix
+    4. Scale by 2*sqrt(d+2) to optimize for slice sampling
+
+    This is equivalent to sampling from N(0, S) and normalizing by Mahalanobis norm
+    but is more numerically stable and efficient.
+
+    The scaling factor 2*sqrt(d+2) corrects for two effects:
+    - Factor sqrt(d+2): Empirical covariance of uniform d-ball has Σ = R²/(d+2) I,
+      underestimating spatial extent by (d+2)
+    - Factor 2: Initial slice interval should span diameter (2R) not radius (R)
 
     Parameters
     ----------
     rng_key
         A JAX PRNG key.
+    position
+        The current position of the chain (used for extracting shape).
     cov
-        The covariance matrix for the multivariate Gaussian distribution from which
-        the initial direction is sampled. Assumed to be a 2D array.
-
+        The covariance matrix.
     Returns
     -------
     Array
         A normalized direction vector (1D array).
     """
-    d = jax.random.multivariate_normal(rng_key, mean=jnp.zeros(cov.shape[0]), cov=cov)
-    invcov = jnp.linalg.inv(cov)
-    norm = jnp.sqrt(jnp.einsum("...i,...ij,...j", d, invcov, d))
-    d = d / norm[..., None]
-    return d
+    p, unravel_fn = jax.flatten_util.ravel_pytree(position)
+    u = jax.random.normal(rng_key, shape=p.shape, dtype=p.dtype)
+    u /= jnp.linalg.norm(u)
+    L = jnp.linalg.cholesky(cov).astype(p.dtype)
+    dim = cov.shape[0]
+    L = L * 2 * jnp.sqrt(dim + 2)
+    d = linear_map(L, u)
+    return unravel_fn(d)
 
 
 def hrss_as_top_level_api(
     logdensity_fn: Callable,
     cov: Array,
+    init_fn: Callable = init,
+    max_steps: int = 10,
+    max_shrinkage: int = 100,
 ) -> SamplingAlgorithm:
     """Creates a Hit-and-Run Slice Sampling algorithm.
 
@@ -375,9 +359,16 @@ def hrss_as_top_level_api(
     logdensity_fn
         The log-density function of the target distribution to sample from.
     cov
-        The covariance matrix used by the default direction proposal function
-        (`default_proposal_distribution`). This matrix shapes the random
+        The covariance matrix used by the direction proposal function
+        (`sample_direction_from_covariance`). This matrix shapes the random
         directions proposed for the slice sampling steps.
+    init_fn
+        A function initializing a SliceState
+    max_steps
+        The maximum number of steps to take when expanding the interval in
+        each direction during the stepping-out phase.
+    max_shrinkage
+        The maximum number of shrinking steps to perform to avoid infinite loops.
 
     Returns
     -------
@@ -385,8 +376,7 @@ def hrss_as_top_level_api(
         A `SamplingAlgorithm` tuple containing `init` and `step` functions for
         the configured Hit-and-Run Slice Sampler.
     """
-    generate_slice_direction_fn = partial(sample_direction_from_covariance, cov=cov)
-    kernel = build_hrss_kernel(generate_slice_direction_fn, default_stepper_fn)
-    init_fn = partial(init, logdensity_fn=logdensity_fn)
+    kernel = build_hrss_kernel(cov, init_fn, max_steps, max_shrinkage)
+    init_fn = partial(init_fn, logdensity_fn=logdensity_fn)
     step_fn = partial(kernel, logdensity_fn=logdensity_fn)
     return SamplingAlgorithm(init_fn, step_fn)

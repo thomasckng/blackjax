@@ -166,43 +166,6 @@ class PartitionedInfo(NamedTuple):
     info: NamedTuple
 
 
-def new_state_and_info(position, logprior, loglikelihood, info):
-    """Create new PartitionedState and PartitionedInfo from transition results.
-
-    This utility function packages the results of a transition into the standard
-    partitioned state and info containers, maintaining the separation of logprior
-    and loglikelihood components.
-
-    Parameters
-    ----------
-    position
-        The particle positions after the transition step.
-    logprior
-        The log-prior densities at the new positions.
-    loglikelihood
-        The log-likelihood values at the new positions.
-    info
-        Additional transition-specific information from the step.
-
-    Returns
-    -------
-    tuple[PartitionedState, PartitionedInfo]
-        A tuple containing the new partitioned state and associated information.
-    """
-    new_state = PartitionedState(
-        position=position,
-        logprior=logprior,
-        loglikelihood=loglikelihood,
-    )
-    info = PartitionedInfo(
-        position=position,
-        logprior=logprior,
-        loglikelihood=loglikelihood,
-        info=info,
-    )
-    return new_state, info
-
-
 def init(
     particles: ArrayLikeTree,
     logprior_fn: Callable,
@@ -239,7 +202,7 @@ def init(
     loglikelihood = loglikelihood_fn(particles)
     loglikelihood_birth = loglikelihood_birth * jnp.ones_like(loglikelihood)
     logprior = logprior_fn(particles)
-    pid = jnp.arange(len(loglikelihood))
+    pid = jnp.arange(len(loglikelihood), dtype=jnp.int32)
     dtype = loglikelihood.dtype
     logX = jnp.array(logX, dtype=dtype)
     logZ = jnp.array(logZ, dtype=dtype)
@@ -344,7 +307,7 @@ def build_kernel(
             new_inner_state.loglikelihood
         )
         loglikelihood_birth = state.loglikelihood_birth.at[target_update_idx].set(
-            loglikelihood_0 * jnp.ones(len(target_update_idx))
+            loglikelihood_0
         )
         logprior = state.logprior.at[target_update_idx].set(new_inner_state.logprior)
         pid = state.pid.at[target_update_idx].set(state.pid[start_idx])
@@ -414,7 +377,7 @@ def delete_fn(
     loglikelihood = state.loglikelihood
     neg_dead_loglikelihood, dead_idx = jax.lax.top_k(-loglikelihood, num_delete)
     constraint_loglikelihood = loglikelihood > -neg_dead_loglikelihood.min()
-    weights = jnp.array(constraint_loglikelihood, dtype=jnp.float32)
+    weights = jnp.array(constraint_loglikelihood, dtype=loglikelihood.dtype)
     weights = jnp.where(weights.sum() > 0.0, weights, jnp.ones_like(weights))
     start_idx = jax.random.choice(
         rng_key,
@@ -432,7 +395,7 @@ def update_ns_runtime_info(
 ) -> tuple[Array, Array, Array]:
     num_particles = len(loglikelihood)
     num_deleted = len(dead_loglikelihood)
-    num_live = jnp.arange(num_particles, num_particles - num_deleted, -1)
+    num_live = jnp.arange(num_particles, num_particles - num_deleted, -1, dtype=loglikelihood.dtype)
     delta_logX = -1 / num_live
     logX = logX + jnp.cumsum(delta_logX)
     log_delta_X = logX + jnp.log(1 - jnp.exp(delta_logX))
@@ -445,4 +408,5 @@ def update_ns_runtime_info(
 
 
 def logmeanexp(x: Array) -> Array:
-    return logsumexp(x) - jnp.log(len(x))
+    n = jnp.array(x.shape[0], dtype=x.dtype)
+    return logsumexp(x) - jnp.log(n)
