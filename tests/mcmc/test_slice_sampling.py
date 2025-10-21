@@ -46,12 +46,10 @@ class SliceSamplingTest(chex.TestCase):
         key = jax.random.key(456)
         position = jnp.zeros(ndim)
 
-        # Build kernel with normalized random direction
-        def direction_fn(rng_key, pos):
-            d = jax.random.normal(rng_key, (ndim,))
-            return d / jnp.linalg.norm(d)
+        # Build kernel with identity covariance matrix
+        cov = jnp.eye(ndim)
 
-        kernel = ss.build_hrss_kernel(direction_fn)
+        kernel = ss.build_hrss_kernel(cov)
         state = ss.init(position, logdensity_fn)
 
         # Take one step
@@ -111,10 +109,13 @@ class SliceSamplingTest(chex.TestCase):
 
         chex.assert_shape(direction, (3,))
 
-        # Direction should be normalized in Mahalanobis sense
+        # Direction should be normalized in Mahalanobis sense with scaling factor
+        # The scaling factor is 2 * sqrt(dim + 2)
+        dim = 3
+        expected_norm = 2 * jnp.sqrt(dim + 2)
         invcov = jnp.linalg.inv(cov)
         mahal_norm = jnp.sqrt(jnp.einsum("i,ij,j", direction, invcov, direction))
-        chex.assert_trees_all_close(mahal_norm, 1.0, atol=1e-6)
+        chex.assert_trees_all_close(mahal_norm, expected_norm, atol=1e-6)
 
     def test_hrss_top_level_api(self):
         """Test hit-and-run slice sampling top-level API"""

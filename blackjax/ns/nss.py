@@ -120,13 +120,13 @@ def compute_covariance_from_particles(
 
 
 def init_slice_state(
-    x: ArrayTree, logprior_fn: Callable, loglikelihood_fn: Callable
+    position: ArrayTree, logprior_fn: Callable, loglikelihood_fn: Callable
 ) -> SliceStateWithLoglikelihood:
     """Simple default initialization function for NSS SliceState."""
-    logprior = logprior_fn(x)
-    loglikelihood = loglikelihood_fn(x)
+    logprior = logprior_fn(position)
+    loglikelihood = loglikelihood_fn(position)
     return SliceStateWithLoglikelihood(
-        position=x,
+        position=position,
         logdensity=logprior,
         loglikelihood=loglikelihood,
     )
