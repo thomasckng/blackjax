@@ -105,6 +105,7 @@ class NSInfo(NamedTuple):
     loglikelihood: Array  # The log-likelihood of the particles
     loglikelihood_birth: Array  # The log-likelihood threshold at particle birth
     logprior: Array  # The log-prior density of the particles
+    inner_kernel_states: NamedTuple
     inner_kernel_info: NamedTuple  # Information from the inner kernel update step
 
 
@@ -136,26 +137,7 @@ class PartitionedState(NamedTuple):
 
 
 class PartitionedInfo(NamedTuple):
-    """Records paritioned state information
-
-    Attributes
-    ----------
-    position
-        A PyTree of arrays representing the final positions after the transition step.
-        Structure matches the input particle positions.
-    logprior
-        An array of log-prior density values at the final positions.
-        Kept separate to support posterior repartitioning schemes.
-        Shape: (n_particles,)
-    loglikelihood
-        An array of log-likelihood values at the final positions.
-        Kept separate to support posterior repartitioning schemes.
-        Shape: (n_particles,)
-    info
-        Additional transition-specific diagnostic information from the step.
-        The content and structure depend on the specific transition implementation
-        (e.g., acceptance rates, step sizes, number of evaluations, etc.).
-    """
+    """A wrapper around a Paritioned transition kernel info"""
 
     transition_state: PartitionedState
     transition_info: NamedTuple
@@ -354,7 +336,8 @@ def build_kernel(
             dead_loglikelihood,
             dead_loglikelihood_birth,
             dead_logprior,
-            inner_info,
+            inner_info.transition_state,
+            inner_info.transition_info,
         )
         return state, info
 
