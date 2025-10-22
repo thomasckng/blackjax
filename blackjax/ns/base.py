@@ -136,10 +136,7 @@ class PartitionedState(NamedTuple):
 
 
 class PartitionedInfo(NamedTuple):
-    """Transition information that additionally records a partitioned loglikelihood
-    and logprior.
-
-    See PartitionedState
+    """Records paritioned state information
 
     Attributes
     ----------
@@ -160,10 +157,8 @@ class PartitionedInfo(NamedTuple):
         (e.g., acceptance rates, step sizes, number of evaluations, etc.).
     """
 
-    position: ArrayTree
-    logprior: ArrayTree
-    loglikelihood: ArrayTree
-    info: NamedTuple
+    transition_state: PartitionedState
+    transition_info: NamedTuple
 
 
 def init_partitioned_state(

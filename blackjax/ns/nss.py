@@ -27,7 +27,7 @@ from blackjax.mcmc.ss import build_kernel as build_slice_kernel
 from blackjax.mcmc.ss import sample_direction_from_covariance
 from blackjax.ns.adaptive import build_kernel as build_adaptive_kernel
 from blackjax.ns.adaptive import init
-from blackjax.ns.base import NSInfo, NSState, PartitionedState
+from blackjax.ns.base import NSInfo, NSState, PartitionedInfo, PartitionedState
 from blackjax.ns.base import delete_fn as default_delete_fn
 from blackjax.ns.base import init_partitioned_state
 from blackjax.ns.utils import repeat_kernel
@@ -122,7 +122,10 @@ def build_kernel(
             logdensity=new_slice_state.logdensity,
             loglikelihood=new_slice_state.loglikelihood,
         )
-        return new_state, slice_info
+        new_info = PartitionedInfo(
+            transition_state=new_state, transition_info=slice_info
+        )
+        return new_state, new_info
 
     delete_fn = partial(default_delete_fn, num_delete=num_delete)
 
