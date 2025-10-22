@@ -131,7 +131,7 @@ class PartitionedState(NamedTuple):
     """
 
     position: ArrayLikeTree  # Current positions of particles in the inner kernel
-    logprior: Array  # Log-prior values for particles in the inner kernel
+    logdensity: Array  # Log-prior values for particles in the inner kernel
     loglikelihood: Array  # Log-likelihood values for particles in the inner kernel
 
 
@@ -164,6 +164,31 @@ class PartitionedInfo(NamedTuple):
     logprior: ArrayTree
     loglikelihood: ArrayTree
     info: NamedTuple
+
+
+def init_partitioned_state(
+    position: ArrayLikeTree, logprior_fn: Callable, loglikelihood_fn: Callable
+) -> PartitionedState:
+    """Initializes a PartitionedState for the inner kernel.
+
+    Parameters
+    ----------
+    position
+        A PyTree of arrays representing the initial positions of the particles.
+        Each leaf array has a leading dimension corresponding to the number of particles.
+    logprior
+        A function that computes the log-prior density for a single particle.
+    loglikelihood
+        A function that computes the log-likelihood for a single particle.
+
+    Returns
+    -------
+    PartitionedState
+        The initialized state containing positions, log-prior, and log-likelihood.
+    """
+    logprior_values = logprior_fn(position)
+    loglikelihood_values = loglikelihood_fn(position)
+    return PartitionedState(position, logprior_values, loglikelihood_values)
 
 
 def init(
@@ -309,7 +334,7 @@ def build_kernel(
         loglikelihood_birth = state.loglikelihood_birth.at[target_update_idx].set(
             loglikelihood_0
         )
-        logprior = state.logprior.at[target_update_idx].set(new_inner_state.logprior)
+        logprior = state.logprior.at[target_update_idx].set(new_inner_state.logdensity)
         pid = state.pid.at[target_update_idx].set(state.pid[start_idx])
 
         # Update the run-time information
@@ -395,7 +420,9 @@ def update_ns_runtime_info(
 ) -> tuple[Array, Array, Array]:
     num_particles = len(loglikelihood)
     num_deleted = len(dead_loglikelihood)
-    num_live = jnp.arange(num_particles, num_particles - num_deleted, -1, dtype=loglikelihood.dtype)
+    num_live = jnp.arange(
+        num_particles, num_particles - num_deleted, -1, dtype=loglikelihood.dtype
+    )
     delta_logX = -1 / num_live
     logX = logX + jnp.cumsum(delta_logX)
     log_delta_X = logX + jnp.log(1 - jnp.exp(delta_logX))

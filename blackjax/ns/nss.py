@@ -17,7 +17,7 @@ Hit-and-Run Slice Sampling (HRSS) as the inner MCMC kernel.
 """
 
 from functools import partial
-from typing import Callable, Dict, NamedTuple, Optional
+from typing import Callable, Dict, Optional
 
 import jax
 import jax.numpy as jnp
@@ -29,63 +29,16 @@ from blackjax.ns.adaptive import build_kernel as build_adaptive_kernel
 from blackjax.ns.adaptive import init
 from blackjax.ns.base import NSInfo, NSState, PartitionedState
 from blackjax.ns.base import delete_fn as default_delete_fn
+from blackjax.ns.base import init_partitioned_state
 from blackjax.ns.utils import repeat_kernel
 from blackjax.smc.tuning.from_particles import particles_covariance_matrix
-from blackjax.types import Array, ArrayLikeTree, ArrayTree
+from blackjax.types import ArrayTree
 
 __all__ = [
     "init",
     "as_top_level_api",
     "build_kernel",
 ]
-
-
-class SliceStateWithLoglikelihood(NamedTuple):
-    """State used internally by nested slice sampling.
-
-    This extends the basic SliceState to track both the log-likelihood value
-    needed for the likelihood contour constraint.
-
-    Attributes
-    ----------
-    position
-        The current position in parameter space.
-    logdensity
-        The log-prior probability at the current position.
-    loglikelihood
-        The log-likelihood value at the current position.
-    """
-
-    position: ArrayLikeTree
-    logdensity: float
-    loglikelihood: Array
-
-
-class NSSInfo(NamedTuple):
-    """Additional information from the Nested Slice Sampling transition.
-
-    Attributes
-    ----------
-    position
-        The position(s) resulting from the slice sampling step.
-    logprior
-        The log-prior value(s) at the position(s).
-    loglikelihood
-        The log-likelihood value(s) at the position(s).
-    is_accepted
-        Whether the slice sampling proposal was accepted.
-    num_steps
-        The number of steps taken during the stepping-out phase.
-    num_shrink
-        The number of shrinking steps taken during the shrinking phase.
-    """
-
-    position: ArrayTree
-    logprior: ArrayTree
-    loglikelihood: ArrayTree
-    is_accepted: bool
-    num_steps: int
-    num_shrink: int
 
 
 def default_stepper_fn(x: ArrayTree, d: ArrayTree, t: float) -> tuple[ArrayTree, bool]:
@@ -119,19 +72,6 @@ def compute_covariance_from_particles(
     return {"cov": jnp.atleast_2d(particles_covariance_matrix(state.particles))}
 
 
-def init_slice_state(
-    position: ArrayTree, logprior_fn: Callable, loglikelihood_fn: Callable
-) -> SliceStateWithLoglikelihood:
-    """Simple default initialization function for NSS SliceState."""
-    logprior = logprior_fn(position)
-    loglikelihood = loglikelihood_fn(position)
-    return SliceStateWithLoglikelihood(
-        position=position,
-        logdensity=logprior,
-        loglikelihood=loglikelihood,
-    )
-
-
 def build_kernel(
     logprior_fn: Callable,
     loglikelihood_fn: Callable,
@@ -140,7 +80,7 @@ def build_kernel(
     stepper_fn: Callable = default_stepper_fn,
     adapt_direction_params_fn: Callable = compute_covariance_from_particles,
     generate_slice_direction_fn: Callable = sample_direction_from_covariance,
-    slice_init_fn: Callable = init_slice_state,
+    init_partitioned_state_fn: Callable = init_partitioned_state,
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> Callable:
@@ -156,14 +96,14 @@ def build_kernel(
         rng_key, prop_key = jax.random.split(rng_key, 2)
         d = generate_slice_direction_fn(prop_key, state.position, **params)
 
-        def slice_fn(t) -> tuple[SliceStateWithLoglikelihood, bool]:
+        def slice_fn(t) -> tuple[PartitionedState, bool]:
             x, step_accepted = stepper_fn(state.position, d, t)
-            new_state = slice_init_fn(x, logprior_fn, loglikelihood_fn)
+            new_state = init_partitioned_state_fn(x, logprior_fn, loglikelihood_fn)
             in_contour = new_state.loglikelihood > loglikelihood_0
             is_accepted = in_contour & step_accepted
             return new_state, is_accepted
 
-        slice_state = slice_init_fn(
+        slice_state = init_partitioned_state_fn(
             position=state.position,
             logprior_fn=logprior_fn,
             loglikelihood_fn=loglikelihood_fn,
@@ -176,20 +116,13 @@ def build_kernel(
         )
         new_slice_state, slice_info = slice_kernel(rng_key, slice_state)
 
+        # Instantiate new PartitionedState directly to avoid double count
         new_state = PartitionedState(
             position=new_slice_state.position,
-            logprior=new_slice_state.logdensity,
+            logdensity=new_slice_state.logdensity,
             loglikelihood=new_slice_state.loglikelihood,
         )
-        info = NSSInfo(
-            position=new_slice_state.position,
-            logprior=new_slice_state.logdensity,
-            loglikelihood=new_slice_state.loglikelihood,
-            is_accepted=slice_info.is_accepted,
-            num_steps=slice_info.num_steps,
-            num_shrink=slice_info.num_shrink,
-        )
-        return new_state, info
+        return new_state, slice_info
 
     delete_fn = partial(default_delete_fn, num_delete=num_delete)
 
@@ -212,7 +145,7 @@ def as_top_level_api(
     stepper_fn: Callable = default_stepper_fn,
     adapt_direction_params_fn: Callable = compute_covariance_from_particles,
     generate_slice_direction_fn: Callable = sample_direction_from_covariance,
-    slice_init_fn: Callable = init_slice_state,
+    init_partitioned_state_fn: Callable = init_partitioned_state,
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> SamplingAlgorithm:
@@ -269,7 +202,7 @@ def as_top_level_api(
         stepper_fn=stepper_fn,
         adapt_direction_params_fn=adapt_direction_params_fn,
         generate_slice_direction_fn=generate_slice_direction_fn,
-        slice_init_fn=slice_init_fn,
+        init_partitioned_state_fn=init_partitioned_state_fn,
         max_steps=max_steps,
         max_shrinkage=max_shrinkage,
     )
