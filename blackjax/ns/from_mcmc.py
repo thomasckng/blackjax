@@ -33,6 +33,6 @@ def update_with_mcmc_take_last(
             final_state, infos = jax.lax.scan(body_fn, state, keys)
             return final_state, MCMCUpdateInfo(infos[0], infos[1])
 
-        return jax.vmap(mcmc_kernel, in_axes=(0, 0))(rng_key, state)
+        return jax.vmap(mcmc_kernel)(rng_key, state)
 
     return update_function
