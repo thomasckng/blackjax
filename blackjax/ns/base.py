@@ -216,8 +216,6 @@ def init(
 
 
 def build_kernel(
-    logprior_fn: Callable,
-    loglikelihood_fn: Callable,
     delete_fn: Callable,
     inner_kernel: Callable,
 ) -> Callable:
@@ -285,8 +283,6 @@ def build_kernel(
         new_inner_state, inner_update_info = inner_kernel(
             sample_keys,
             inner_state,
-            logprior_fn,
-            loglikelihood_fn,
             loglikelihood_0,
             state.inner_kernel_params,
         )

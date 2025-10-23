@@ -89,9 +89,7 @@ def build_kernel(
     see `as_top_level_api` for parameter descriptions.
     """
 
-    def constrained_mcmc_slice_fn(
-        rng_key, state, logprior_fn, loglikelihood_fn, loglikelihood_0, **params
-    ):
+    def constrained_mcmc_slice_fn(rng_key, state, loglikelihood_0, **params):
         rng_key, prop_key = jax.random.split(rng_key, 2)
         d = generate_slice_direction_fn(prop_key, state.position, **params)
 
@@ -118,8 +116,6 @@ def build_kernel(
 
     update_inner_kernel_params_fn = adapt_direction_params_fn
     kernel = build_adaptive_kernel(
-        logprior_fn,
-        loglikelihood_fn,
         delete_fn,
         inner_kernel,
         update_inner_kernel_params_fn,

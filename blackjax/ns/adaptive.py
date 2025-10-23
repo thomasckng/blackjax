@@ -74,8 +74,6 @@ def init(
 
 
 def build_kernel(
-    logprior_fn: Callable,
-    loglikelihood_fn: Callable,
     delete_fn: Callable,
     inner_kernel: Callable,
     update_inner_kernel_params_fn: Callable[
@@ -119,8 +117,6 @@ def build_kernel(
     """
 
     base_kernel = base_build_kernel(
-        logprior_fn,
-        loglikelihood_fn,
         delete_fn,
         inner_kernel,
     )

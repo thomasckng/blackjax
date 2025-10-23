@@ -17,13 +17,9 @@ def update_with_mcmc_take_last(
 ):
     """An update strategy for NS that uses MCMC to update the particles."""
 
-    def update_function(
-        rng_key, state, logprior_fn, loglikelihood_fn, loglikelihood_0, step_parameters
-    ):
+    def update_function(rng_key, state, loglikelihood_0, step_parameters):
         shared_mcmc_step_fn = partial(
             constrained_mcmc_step_fn,
-            logprior_fn=logprior_fn,
-            loglikelihood_fn=loglikelihood_fn,
             loglikelihood_0=loglikelihood_0,
             **step_parameters,
         )
