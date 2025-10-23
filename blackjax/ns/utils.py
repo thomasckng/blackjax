@@ -242,8 +242,7 @@ def finalise(live: NSState, dead: list[NSInfo]) -> NSInfo:
             live.loglikelihood,
             live.loglikelihood_birth,
             live.logprior,
-            dead[-1].inner_kernel_states,
-            dead[-1].inner_kernel_info,
+            dead[-1].update_info,
         )
     ]
     combined_dead_info = jax.tree.map(

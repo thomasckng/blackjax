@@ -105,11 +105,10 @@ class NSInfo(NamedTuple):
     loglikelihood: Array  # The log-likelihood of the particles
     loglikelihood_birth: Array  # The log-likelihood threshold at particle birth
     logprior: Array  # The log-prior density of the particles
-    inner_kernel_states: NamedTuple
-    inner_kernel_info: NamedTuple  # Information from the inner kernel update step
+    update_info: NamedTuple
 
 
-class PartitionedState(NamedTuple):
+class StateWithLogLikelihood(NamedTuple):
     """State container that partitions out the loglikelihood and logprior.
 
     This intermediate construction wraps around the usual State of an MCMC chain
@@ -136,17 +135,10 @@ class PartitionedState(NamedTuple):
     loglikelihood: Array  # Log-likelihood values for particles in the inner kernel
 
 
-class PartitionedInfo(NamedTuple):
-    """A wrapper around a Paritioned transition kernel info"""
-
-    transition_state: PartitionedState
-    transition_info: NamedTuple
-
-
-def init_partitioned_state(
+def init_state_with_likelihood(
     position: ArrayLikeTree, logprior_fn: Callable, loglikelihood_fn: Callable
-) -> PartitionedState:
-    """Initializes a PartitionedState for the inner kernel.
+) -> StateWithLogLikelihood:
+    """Initializes a StateWithLoglikelihood for the inner kernel.
 
     Parameters
     ----------
@@ -165,7 +157,7 @@ def init_partitioned_state(
     """
     logprior_values = logprior_fn(position)
     loglikelihood_values = loglikelihood_fn(position)
-    return PartitionedState(position, logprior_values, loglikelihood_values)
+    return StateWithLogLikelihood(position, logprior_values, loglikelihood_values)
 
 
 def init(
@@ -289,8 +281,8 @@ def build_kernel(
         particles = jax.tree.map(lambda x: x[start_idx], state.particles)
         logprior = state.logprior[start_idx]
         loglikelihood = state.loglikelihood[start_idx]
-        inner_state = PartitionedState(particles, logprior, loglikelihood)
-        new_inner_state, inner_info = inner_kernel(
+        inner_state = StateWithLogLikelihood(particles, logprior, loglikelihood)
+        new_state, update_info = inner_kernel(
             sample_keys,
             inner_state,
             logprior_fn,
@@ -303,15 +295,15 @@ def build_kernel(
         particles = jax.tree_util.tree_map(
             lambda p, n: p.at[target_update_idx].set(n),
             state.particles,
-            new_inner_state.position,
+            new_state.position,
         )
         loglikelihood = state.loglikelihood.at[target_update_idx].set(
-            new_inner_state.loglikelihood
+            new_state.loglikelihood
         )
         loglikelihood_birth = state.loglikelihood_birth.at[target_update_idx].set(
             loglikelihood_0
         )
-        logprior = state.logprior.at[target_update_idx].set(new_inner_state.logdensity)
+        logprior = state.logprior.at[target_update_idx].set(new_state.logdensity)
         pid = state.pid.at[target_update_idx].set(state.pid[start_idx])
 
         # Update the run-time information
@@ -336,8 +328,7 @@ def build_kernel(
             dead_loglikelihood,
             dead_loglikelihood_birth,
             dead_logprior,
-            inner_info.transition_state,
-            inner_info.transition_info,
+            update_info,
         )
         return state, info
 

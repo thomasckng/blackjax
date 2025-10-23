@@ -27,10 +27,10 @@ from blackjax.mcmc.ss import build_kernel as build_slice_kernel
 from blackjax.mcmc.ss import sample_direction_from_covariance
 from blackjax.ns.adaptive import build_kernel as build_adaptive_kernel
 from blackjax.ns.adaptive import init
-from blackjax.ns.base import NSInfo, NSState, PartitionedInfo, PartitionedState
+from blackjax.ns.base import NSInfo, NSState, StateWithLogLikelihood
 from blackjax.ns.base import delete_fn as default_delete_fn
-from blackjax.ns.base import init_partitioned_state
-from blackjax.ns.utils import repeat_kernel
+from blackjax.ns.base import init_state_with_likelihood
+from blackjax.ns.from_mcmc import update_with_mcmc_take_last
 from blackjax.smc.tuning.from_particles import particles_covariance_matrix
 from blackjax.types import ArrayTree
 
@@ -80,7 +80,7 @@ def build_kernel(
     stepper_fn: Callable = default_stepper_fn,
     adapt_direction_params_fn: Callable = compute_covariance_from_particles,
     generate_slice_direction_fn: Callable = sample_direction_from_covariance,
-    init_partitioned_state_fn: Callable = init_partitioned_state,
+    init_partitioned_state_fn: Callable = init_state_with_likelihood,
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> Callable:
@@ -89,43 +89,30 @@ def build_kernel(
     see `as_top_level_api` for parameter descriptions.
     """
 
-    @repeat_kernel(num_inner_steps)
-    def inner_kernel(
-        rng_key, state, logprior_fn, loglikelihood_fn, loglikelihood_0, params
+    def constrained_mcmc_slice_fn(
+        rng_key, state, logprior_fn, loglikelihood_fn, loglikelihood_0, **params
     ):
         rng_key, prop_key = jax.random.split(rng_key, 2)
         d = generate_slice_direction_fn(prop_key, state.position, **params)
 
-        def slice_fn(t) -> tuple[PartitionedState, bool]:
+        def slice_fn(t) -> tuple[StateWithLogLikelihood, bool]:
             x, step_accepted = stepper_fn(state.position, d, t)
             new_state = init_partitioned_state_fn(x, logprior_fn, loglikelihood_fn)
             in_contour = new_state.loglikelihood > loglikelihood_0
             is_accepted = in_contour & step_accepted
             return new_state, is_accepted
 
-        slice_state = init_partitioned_state_fn(
-            position=state.position,
-            logprior_fn=logprior_fn,
-            loglikelihood_fn=loglikelihood_fn,
-        )
-
         slice_kernel = build_slice_kernel(
             slice_fn,
             max_steps=max_steps,
             max_shrinkage=max_shrinkage,
         )
-        new_slice_state, slice_info = slice_kernel(rng_key, slice_state)
+        new_slice_state, slice_info = slice_kernel(rng_key, state)
+        return new_slice_state, slice_info
 
-        # Instantiate new PartitionedState directly to avoid double count
-        new_state = PartitionedState(
-            position=new_slice_state.position,
-            logdensity=new_slice_state.logdensity,
-            loglikelihood=new_slice_state.loglikelihood,
-        )
-        new_info = PartitionedInfo(
-            transition_state=new_state, transition_info=slice_info
-        )
-        return new_state, new_info
+    inner_kernel = update_with_mcmc_take_last(
+        constrained_mcmc_slice_fn, num_inner_steps
+    )
 
     delete_fn = partial(default_delete_fn, num_delete=num_delete)
 
@@ -134,7 +121,7 @@ def build_kernel(
         logprior_fn,
         loglikelihood_fn,
         delete_fn,
-        jax.vmap(inner_kernel, in_axes=(0, 0, None, None, None, None)),
+        inner_kernel,
         update_inner_kernel_params_fn,
     )
     return kernel
@@ -148,7 +135,7 @@ def as_top_level_api(
     stepper_fn: Callable = default_stepper_fn,
     adapt_direction_params_fn: Callable = compute_covariance_from_particles,
     generate_slice_direction_fn: Callable = sample_direction_from_covariance,
-    init_partitioned_state_fn: Callable = init_partitioned_state,
+    init_partitioned_state_fn: Callable = init_state_with_likelihood,
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> SamplingAlgorithm:
