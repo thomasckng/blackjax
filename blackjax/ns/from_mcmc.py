@@ -18,7 +18,9 @@ def update_with_mcmc_take_last(
     constrained_mcmc_step_fn,
     num_mcmc_steps,
 ):
-    """An update strategy for NS that uses MCMC to update the particles."""
+    """An update strategy for NS that uses MCMC to update the particles.
+    For now we will not keep the states as they will be too large to store.
+    """
 
     def update_function(rng_key, state, loglikelihood_0, step_parameters):
         shared_mcmc_step_fn = partial(
@@ -34,7 +36,7 @@ def update_with_mcmc_take_last(
 
             keys = jax.random.split(rng_key, num_mcmc_steps)
             final_state, infos = jax.lax.scan(body_fn, state, keys)
-            return final_state, MCMCUpdateInfo(infos[0], infos[1])
+            return final_state, infos[1]  # MCMCUpdateInfo(infos[0], infos[1])
 
         return jax.vmap(mcmc_kernel)(rng_key, state)
 
