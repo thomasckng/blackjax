@@ -135,10 +135,10 @@ class StateWithLogLikelihood(NamedTuple):
     loglikelihood: Array  # Log-likelihood values for particles in the inner kernel
 
 
-def init_state_with_likelihood(
+def init_state_strategy(
     position: ArrayLikeTree, logprior_fn: Callable, loglikelihood_fn: Callable
 ) -> StateWithLogLikelihood:
-    """Initializes a StateWithLoglikelihood for the inner kernel.
+    """The default initialisation strategy for each state.
 
     Parameters
     ----------
@@ -162,8 +162,7 @@ def init_state_with_likelihood(
 
 def init(
     particles: ArrayLikeTree,
-    logprior_fn: Callable,
-    loglikelihood_fn: Callable,
+    init_state_fn: Callable,
     loglikelihood_birth: Array = -jnp.nan,
     logX: Optional[Array] = 0.0,
     logZ: Optional[Array] = -jnp.inf,
@@ -193,9 +192,10 @@ def init(
     NSState
         The initial state of the Nested Sampler.
     """
-    loglikelihood = loglikelihood_fn(particles)
+    state = init_state_fn(particles)
+    loglikelihood = state.loglikelihood
     loglikelihood_birth = loglikelihood_birth * jnp.ones_like(loglikelihood)
-    logprior = logprior_fn(particles)
+    logprior = state.logdensity
     pid = jnp.arange(len(loglikelihood), dtype=jnp.int32)
     dtype = loglikelihood.dtype
     logX = jnp.array(logX, dtype=dtype)
