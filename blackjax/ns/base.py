@@ -95,7 +95,7 @@ class NSInfo(NamedTuple):
         The birth log-likelihood thresholds of the dead particles.
     logprior
         The log-prior values of the dead particles.
-    inner_kernel_info
+    update_info
         A NamedTuple (or any PyTree) containing information from the update step
         (inner kernel) used to generate new live particles. The content
         depends on the specific inner kernel used.
@@ -282,7 +282,7 @@ def build_kernel(
         logprior = state.logprior[start_idx]
         loglikelihood = state.loglikelihood[start_idx]
         inner_state = StateWithLogLikelihood(particles, logprior, loglikelihood)
-        new_state, update_info = inner_kernel(
+        new_inner_state, inner_update_info = inner_kernel(
             sample_keys,
             inner_state,
             logprior_fn,
@@ -295,15 +295,15 @@ def build_kernel(
         particles = jax.tree_util.tree_map(
             lambda p, n: p.at[target_update_idx].set(n),
             state.particles,
-            new_state.position,
+            new_inner_state.position,
         )
         loglikelihood = state.loglikelihood.at[target_update_idx].set(
-            new_state.loglikelihood
+            new_inner_state.loglikelihood
         )
         loglikelihood_birth = state.loglikelihood_birth.at[target_update_idx].set(
             loglikelihood_0
         )
-        logprior = state.logprior.at[target_update_idx].set(new_state.logdensity)
+        logprior = state.logprior.at[target_update_idx].set(new_inner_state.logdensity)
         pid = state.pid.at[target_update_idx].set(state.pid[start_idx])
 
         # Update the run-time information
@@ -328,7 +328,7 @@ def build_kernel(
             dead_loglikelihood,
             dead_loglikelihood_birth,
             dead_logprior,
-            update_info,
+            inner_update_info,
         )
         return state, info
 
