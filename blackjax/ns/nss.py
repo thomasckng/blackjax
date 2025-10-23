@@ -80,7 +80,7 @@ def build_kernel(
     stepper_fn: Callable = default_stepper_fn,
     adapt_direction_params_fn: Callable = compute_covariance_from_particles,
     generate_slice_direction_fn: Callable = sample_direction_from_covariance,
-    init_partitioned_state_fn: Callable = init_state_with_likelihood,
+    init_inner_state_fn: Callable = init_state_with_likelihood,
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> Callable:
@@ -97,7 +97,7 @@ def build_kernel(
 
         def slice_fn(t) -> tuple[StateWithLogLikelihood, bool]:
             x, step_accepted = stepper_fn(state.position, d, t)
-            new_state = init_partitioned_state_fn(x, logprior_fn, loglikelihood_fn)
+            new_state = init_inner_state_fn(x, logprior_fn, loglikelihood_fn)
             in_contour = new_state.loglikelihood > loglikelihood_0
             is_accepted = in_contour & step_accepted
             return new_state, is_accepted
@@ -135,7 +135,7 @@ def as_top_level_api(
     stepper_fn: Callable = default_stepper_fn,
     adapt_direction_params_fn: Callable = compute_covariance_from_particles,
     generate_slice_direction_fn: Callable = sample_direction_from_covariance,
-    init_partitioned_state_fn: Callable = init_state_with_likelihood,
+    init_inner_state_fn: Callable = init_state_with_likelihood,
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> SamplingAlgorithm:
@@ -192,7 +192,7 @@ def as_top_level_api(
         stepper_fn=stepper_fn,
         adapt_direction_params_fn=adapt_direction_params_fn,
         generate_slice_direction_fn=generate_slice_direction_fn,
-        init_partitioned_state_fn=init_partitioned_state_fn,
+        init_inner_state_fn=init_inner_state_fn,
         max_steps=max_steps,
         max_shrinkage=max_shrinkage,
     )
