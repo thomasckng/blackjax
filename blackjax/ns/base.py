@@ -37,7 +37,7 @@ from jax.scipy.special import logsumexp
 
 from blackjax.types import Array, ArrayLikeTree, ArrayTree, PRNGKey
 
-__all__ = ["init", "build_kernel", "NSState", "NSInfo", "delete_fn"]
+__all__ = ["init", "build_kernel", "NSState", "NSInfo", "StateWithLogLikelihood", "delete_fn"]
 
 
 class StateWithLogLikelihood(NamedTuple):
@@ -75,20 +75,11 @@ class NSState(NamedTuple):
     particles
         StateWithLogLikelihood containing the current live particles.
         Includes position, logdensity, loglikelihood, and loglikelihood_birth.
-    logX
-        The log of the current prior volume estimate.
-    logZ
-        The accumulated log evidence estimate from the "dead" points.
-    logZ_live
-        The current estimate of the log evidence contribution from the live points.
     inner_kernel_params
         A dictionary of parameters for the inner kernel.
     """
 
     particles: StateWithLogLikelihood
-    logX: Array
-    logZ: Array
-    logZ_live: Array
     inner_kernel_params: Dict
 
 
@@ -146,8 +137,6 @@ def init(
     positions: ArrayLikeTree,
     init_state_fn: Callable,
     loglikelihood_birth: Array = jnp.nan,
-    logX: Optional[Array] = 0.0,
-    logZ: Optional[Array] = -jnp.inf,
 ) -> NSState:
     """Initializes the Nested Sampler state.
 
@@ -162,10 +151,6 @@ def init(
     loglikelihood_birth
         The initial log-likelihood birth threshold. Defaults to NaN, which
         implies no initial likelihood constraint beyond the prior.
-    logX
-        The initial log prior volume estimate. Defaults to 0.0.
-    logZ
-        The initial log evidence estimate. Defaults to -inf.
 
     Returns
     -------
@@ -174,18 +159,8 @@ def init(
     """
     loglikelihood_birth_array = loglikelihood_birth * jnp.ones(len(positions))
     state = init_state_fn(positions, loglikelihood_birth=loglikelihood_birth_array)
-    dtype = state.loglikelihood.dtype
-    logX = jnp.array(logX, dtype=dtype)
-    logZ = jnp.array(logZ, dtype=dtype)
-    logZ_live = logmeanexp(state.loglikelihood) + logX
     inner_kernel_params: Dict = {}
-    return NSState(
-        state,
-        logX,
-        logZ,
-        logZ_live,
-        inner_kernel_params,
-    )
+    return NSState(state, inner_kernel_params)
 
 
 def build_kernel(
@@ -239,14 +214,11 @@ def build_kernel(
         dead_particles = jax.tree.map(lambda x: x[dead_idx], state.particles)
 
         # Resample the live particles
-        loglikelihood_0 = dead_particles.loglikelihood.max()
         sample_keys = jax.random.split(rng_key, len(start_idx))
         inner_state = jax.tree.map(lambda x: x[start_idx], state.particles)
+        loglikelihood_0 = dead_particles.loglikelihood.max()
         new_inner_state, inner_update_info = inner_kernel(
-            sample_keys,
-            inner_state,
-            loglikelihood_0,
-            state.inner_kernel_params,
+            sample_keys, inner_state, loglikelihood_0, state.inner_kernel_params
         )
 
         # Update the particles
@@ -256,17 +228,9 @@ def build_kernel(
             new_inner_state,
         )
 
-        # Update the run-time information
-        logX, logZ, logZ_live = update_ns_runtime_info(
-            state.logX, state.logZ, new_particles.loglikelihood, dead_particles.loglikelihood
-        )
-
         # Return updated state and info
         new_state = NSState(
             new_particles,
-            logX,
-            logZ,
-            logZ_live,
             state.inner_kernel_params,
         )
         info = NSInfo(
@@ -327,25 +291,3 @@ def delete_fn(
     return dead_idx, target_update_idx, start_idx
 
 
-def update_ns_runtime_info(
-    logX: Array, logZ: Array, loglikelihood: Array, dead_loglikelihood: Array
-) -> tuple[Array, Array, Array]:
-    num_particles = len(loglikelihood)
-    num_deleted = len(dead_loglikelihood)
-    num_live = jnp.arange(
-        num_particles, num_particles - num_deleted, -1, dtype=loglikelihood.dtype
-    )
-    delta_logX = -1 / num_live
-    logX = logX + jnp.cumsum(delta_logX)
-    log_delta_X = logX + jnp.log(1 - jnp.exp(delta_logX))
-    log_delta_Z = dead_loglikelihood + log_delta_X
-
-    delta_logZ = logsumexp(log_delta_Z)
-    logZ = jnp.logaddexp(logZ, delta_logZ)
-    logZ_live = logmeanexp(loglikelihood) + logX[-1]
-    return logX[-1], logZ, logZ_live
-
-
-def logmeanexp(x: Array) -> Array:
-    n = jnp.array(x.shape[0], dtype=x.dtype)
-    return logsumexp(x) - jnp.log(n)
