@@ -136,7 +136,6 @@ def init_state_strategy(
     """
     logprior_values = logprior_fn(position)
     loglikelihood_values = loglikelihood_fn(position)
-    # loglikelihood_birth is already broadcast to the right shape by the caller
     return StateWithLogLikelihood(
         position, logprior_values, loglikelihood_values, loglikelihood_birth
     )
@@ -172,11 +171,7 @@ def init(
     NSState
         The initial state of the Nested Sampler.
     """
-    # Broadcast loglikelihood_birth to have a batch dimension for vmap compatibility
-    # First, get the number of particles from positions
-    num_particles = jax.tree_util.tree_flatten(positions)[0][0].shape[0]
-    loglikelihood_birth_array = loglikelihood_birth * jnp.ones(num_particles)
-
+    loglikelihood_birth_array = loglikelihood_birth * jnp.ones(len(positions))
     state = init_state_fn(positions, loglikelihood_birth=loglikelihood_birth_array)
     dtype = state.loglikelihood.dtype
     logX = jnp.array(logX, dtype=dtype)
