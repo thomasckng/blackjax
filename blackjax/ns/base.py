@@ -98,8 +98,7 @@ class NSInfo(NamedTuple):
     ----------
     particles
         The StateWithLogLikelihood of particles that were marked as "dead" (replaced).
-    loglikelihood
-        The log-likelihood values of the dead particles (extracted for evidence calculation).
+        Contains position, logdensity, and loglikelihood.
     loglikelihood_birth
         The birth log-likelihood thresholds of the dead particles.
     update_info
@@ -108,7 +107,6 @@ class NSInfo(NamedTuple):
     """
 
     particles: StateWithLogLikelihood
-    loglikelihood: Array
     loglikelihood_birth: Array
     update_info: NamedTuple
 
@@ -275,7 +273,6 @@ def build_kernel(
         )
         info = NSInfo(
             dead_particles,
-            dead_particles.loglikelihood,
             dead_loglikelihood_birth,
             inner_update_info,
         )

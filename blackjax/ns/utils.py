@@ -91,7 +91,7 @@ def compute_num_live(info: NSInfo) -> Array:
         was considered "dead".
     """
     birth_logL = info.loglikelihood_birth
-    death_logL = info.loglikelihood
+    death_logL = info.particles.loglikelihood
 
     birth_events = jnp.column_stack(
         (birth_logL, jnp.ones_like(birth_logL, dtype=jnp.int32))
@@ -147,12 +147,12 @@ def logX(rng_key: PRNGKey, dead_info: NSInfo, shape: int = 100) -> tuple[Array, 
           `dX_i` is approximately `X_i - X_{i+1}`.
     """
     rng_key, subkey = jax.random.split(rng_key)
-    min_val = jnp.finfo(dead_info.loglikelihood.dtype).tiny
+    min_val = jnp.finfo(dead_info.particles.loglikelihood.dtype).tiny
     r = jnp.log(
         jax.random.uniform(
             subkey,
-            shape=(dead_info.loglikelihood.shape[0], shape),
-            dtype=dead_info.loglikelihood.dtype,
+            shape=(dead_info.particles.loglikelihood.shape[0], shape),
+            dtype=dead_info.particles.loglikelihood.dtype,
         ).clip(min_val, 1 - min_val)
     )
 
@@ -201,12 +201,12 @@ def log_weights(
         An array of log importance weights, shape `(num_dead_particles, *shape)`.
         The original order of particles in `dead_info` is preserved.
     """
-    sort_indices = jnp.argsort(dead_info.loglikelihood)
+    sort_indices = jnp.argsort(dead_info.particles.loglikelihood)
     unsort_indices = jnp.empty_like(sort_indices)
     unsort_indices = unsort_indices.at[sort_indices].set(jnp.arange(len(sort_indices)))
     dead_info_sorted = jax.tree.map(lambda x: x[sort_indices], dead_info)
     _, log_dX = logX(rng_key, dead_info_sorted, shape)
-    log_w = log_dX + beta * dead_info_sorted.loglikelihood[..., jnp.newaxis]
+    log_w = log_dX + beta * dead_info_sorted.particles.loglikelihood[..., jnp.newaxis]
     return log_w[unsort_indices]
 
 
@@ -239,7 +239,6 @@ def finalise(live: NSState, dead: list[NSInfo]) -> NSInfo:
     all_pytrees_to_combine = dead + [
         NSInfo(
             live.particles,
-            live.particles.loglikelihood,
             live.loglikelihood_birth,
             dead[-1].update_info,
         )
@@ -308,7 +307,7 @@ def sample(rng_key: PRNGKey, dead_info_map: NSInfo, shape: int = 1000) -> ArrayT
     logw = log_weights(rng_key, dead_info_map).mean(axis=-1)
     indices = jax.random.choice(
         rng_key,
-        dead_info_map.loglikelihood.shape[0],
+        dead_info_map.particles.loglikelihood.shape[0],
         p=jnp.exp(logw.squeeze() - jnp.max(logw)),
         shape=(shape,),
         replace=True,
