@@ -93,7 +93,7 @@ def build_kernel(
 
         def slice_fn(t) -> tuple[StateWithLogLikelihood, bool]:
             x, step_accepted = stepper_fn(state.position, d, t)
-            new_state = init_state_fn(x)
+            new_state = init_state_fn(x, loglikelihood_birth=loglikelihood_0)
             in_contour = new_state.loglikelihood > loglikelihood_0
             is_accepted = in_contour & step_accepted
             return new_state, is_accepted
@@ -196,6 +196,7 @@ def as_top_level_api(
 
     def init_fn(position, rng_key=None):
         # Vectorize the functions for parallel evaluation over particles
+        # vmap maps over positional args, keyword args (like loglikelihood_birth) are broadcast
         return init(
             position,
             init_state_fn=jax.vmap(init_state_fn),

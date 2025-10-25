@@ -90,7 +90,7 @@ def compute_num_live(info: NSInfo) -> Array:
         points `m*_i` when the j-th particle (in the sorted list of dead particles)
         was considered "dead".
     """
-    birth_logL = info.loglikelihood_birth
+    birth_logL = info.particles.loglikelihood_birth
     death_logL = info.particles.loglikelihood
 
     birth_events = jnp.column_stack(
@@ -239,7 +239,6 @@ def finalise(live: NSState, dead: list[NSInfo]) -> NSInfo:
     all_pytrees_to_combine = dead + [
         NSInfo(
             live.particles,
-            live.loglikelihood_birth,
             dead[-1].update_info,
         )
     ]

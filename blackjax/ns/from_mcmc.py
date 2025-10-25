@@ -55,9 +55,9 @@ def build_kernel(
 
     def constrained_mcmc_step_fn(rng_key, state, loglikelihood_0, **params):
         rng_key, prop_key = jax.random.split(rng_key, 2)
-        mcmc_state = mcmc_init_fn(rng_key, state.position, state.logprior)
+        mcmc_state = mcmc_init_fn(rng_key, state.position, state.logdensity)
         new_mcmc_state, mcmc_info = mcmc_step_fn(prop_key, mcmc_state, **params)
-        new_state = init_state_fn(new_mcmc_state.position)
+        new_state = init_state_fn(new_mcmc_state.position, loglikelihood_birth=loglikelihood_0)
         new_state = jax.lax.cond(
             new_state.loglikelihood > loglikelihood_0,
             lambda _: new_state,
