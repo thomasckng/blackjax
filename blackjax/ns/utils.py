@@ -238,7 +238,7 @@ def finalise(live: NSState, dead: list[NSInfo]) -> NSInfo:
 
     all_pytrees_to_combine = dead + [
         NSInfo(
-            live.particles,
+            live,
             dead[-1].update_info,
         )
     ]

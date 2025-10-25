@@ -67,10 +67,10 @@ def init_integrator(live_state: NSState) -> NSIntegrator:
         The initial integrator with logX=0, logZ=-inf, and logZ_live computed
         from the initial live points.
     """
-    dtype = live_state.particles.loglikelihood.dtype
+    dtype = live_state.loglikelihood.dtype
     logX = jnp.array(0.0, dtype=dtype)
     logZ = jnp.array(-jnp.inf, dtype=dtype)
-    logZ_live = _logmeanexp(live_state.particles.loglikelihood) + logX
+    logZ_live = _logmeanexp(live_state.loglikelihood) + logX
     return NSIntegrator(logX, logZ, logZ_live)
 
 
@@ -93,7 +93,7 @@ def update_integrator(
     NSIntegrator
         The updated integrator with new logX, logZ, and logZ_live.
     """
-    loglikelihood = live_state.particles.loglikelihood
+    loglikelihood = live_state.loglikelihood
     dead_loglikelihood = dead_info.particles.loglikelihood
 
     num_particles = len(loglikelihood)

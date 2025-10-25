@@ -14,7 +14,7 @@
 """Nested Sampling Algorithms in BlackJAX.
 
 This subpackage provides implementations of Nested Sampling algorithms,
-including a base version, an adaptive version, and Nested Slice Sampling (NSS).
+including a base version and Nested Slice Sampling (NSS).
 
 Nested Sampling is a Monte Carlo method for Bayesian computation, primarily
 used for evidence (marginal likelihood) calculation and posterior sampling.
@@ -23,20 +23,19 @@ complex likelihood landscapes.
 
 Available modules:
 ------------------
-- `adaptive`: Implements an adaptive Nested Sampling algorithm where inner
-              kernel parameters are tuned at each iteration.
-- `base`: Provides core components and a non-adaptive Nested Sampling kernel.
+- `base`: Provides core components for Nested Sampling.
 - `nss`: Implements Nested Slice Sampling, using Hit-and-Run Slice Sampling as
          the inner kernel with adaptive tuning of its proposal mechanism.
+- `integrator`: Provides NSIntegrator for tracking evidence integration.
 - `utils`: Contains utility functions for processing and analyzing Nested
            Sampling results.
 
 """
-from . import adaptive, base, nss, utils
+from . import base, integrator, nss, utils
 
 __all__ = [
-    "adaptive",
     "base",
-    "utils",
+    "integrator",
     "nss",
+    "utils",
 ]

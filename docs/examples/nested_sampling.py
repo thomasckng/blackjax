@@ -5,6 +5,7 @@ from jax.scipy.linalg import inv, solve
 
 import blackjax
 from blackjax.ns.integrator import NSIntegrator, init_integrator, update_integrator
+from blackjax.ns.nss import init_inner_kernel_params, update_inner_kernel_params
 from blackjax.ns.utils import finalise, log_weights
 
 # jax.config.update("jax_enable_x64", True)
@@ -94,6 +95,7 @@ initial_particles = jax.random.multivariate_normal(
 
 live = algo.init(initial_particles)
 integrator = init_integrator(live)
+inner_kernel_params = init_inner_kernel_params(live)
 step_fn = jax.jit(algo.step)
 dead = []
 # with jax.disable_jit():
@@ -103,8 +105,9 @@ for _ in tqdm.trange(1000):
     if integrator.logZ_live - integrator.logZ < -3:
         break
     rng_key, subkey = jax.random.split(rng_key, 2)
-    live, dead_info = step_fn(subkey, live)
+    live, dead_info = step_fn(subkey, live, inner_kernel_params)
     integrator = update_integrator(integrator, live, dead_info)
+    inner_kernel_params = update_inner_kernel_params(live, dead_info, inner_kernel_params)
     dead.append(dead_info)
 
 # It is now not too bad to remap the list of NSInfos into a single instance

@@ -37,28 +37,27 @@ from jax.scipy.special import logsumexp
 
 from blackjax.types import Array, ArrayLikeTree, ArrayTree, PRNGKey
 
-__all__ = ["init", "build_kernel", "NSState", "NSInfo", "StateWithLogLikelihood", "delete_fn"]
+__all__ = ["init", "build_kernel", "NSState", "NSInfo", "delete_fn"]
 
 
-class StateWithLogLikelihood(NamedTuple):
-    """State container that partitions out the loglikelihood and logprior.
+class NSState(NamedTuple):
+    """State of the Nested Sampler.
 
-    This intermediate construction wraps around the usual State of an MCMC chain
-    so that the loglikelihood and logprior can be efficiently recorded, a
-    necessary step for the Partition function reconstruction that Nested
-    Sampling builds.
+    Contains the current live particles with their positions, log-prior density,
+    log-likelihood values, and birth likelihood contours.
 
     Attributes
     ----------
     position
-        A PyTree representing the position of the particle in parameter space.
+        A PyTree representing the position of the particles in parameter space.
+        The leading dimension corresponds to the number of particles.
     logdensity
-        The log-prior density value of the particle.
+        The log-prior density values of the particles.
     loglikelihood
-        The log-likelihood value of the particle.
+        The log-likelihood values of the particles.
     loglikelihood_birth
-        The log-likelihood threshold that this particle was required to exceed
-        when it was sampled (i.e., its birth likelihood contour).
+        The log-likelihood thresholds that the particles were required to exceed
+        when they were sampled (i.e., their birth likelihood contours).
     """
 
     position: ArrayLikeTree
@@ -67,36 +66,20 @@ class StateWithLogLikelihood(NamedTuple):
     loglikelihood_birth: Array
 
 
-class NSState(NamedTuple):
-    """State of the Nested Sampler.
-
-    Attributes
-    ----------
-    particles
-        StateWithLogLikelihood containing the current live particles.
-        Includes position, logdensity, loglikelihood, and loglikelihood_birth.
-    inner_kernel_params
-        A dictionary of parameters for the inner kernel.
-    """
-
-    particles: StateWithLogLikelihood
-    inner_kernel_params: Dict
-
-
 class NSInfo(NamedTuple):
     """Additional information returned at each step of the Nested Sampling algorithm.
 
     Attributes
     ----------
     particles
-        The StateWithLogLikelihood of particles that were marked as "dead" (replaced).
+        The NSState of particles that were marked as "dead" (replaced).
         Contains position, logdensity, loglikelihood, and loglikelihood_birth.
     update_info
         A NamedTuple (or any PyTree) containing information from the update step
         (inner kernel) used to generate new live particles.
     """
 
-    particles: StateWithLogLikelihood
+    particles: NSState
     update_info: NamedTuple
 
 
@@ -105,7 +88,7 @@ def init_state_strategy(
     logprior_fn: Callable,
     loglikelihood_fn: Callable,
     loglikelihood_birth: Array = jnp.nan,
-) -> StateWithLogLikelihood:
+) -> NSState:
     """The default initialisation strategy for each state.
 
     Parameters
@@ -122,13 +105,13 @@ def init_state_strategy(
 
     Returns
     -------
-    StateWithLogLikelihood
+    NSState
         The initialized state containing positions, log-prior, log-likelihood, and birth likelihood.
     """
     logprior_values = logprior_fn(position)
     loglikelihood_values = loglikelihood_fn(position)
     loglikelihood_birth_values = loglikelihood_birth * jnp.ones_like(loglikelihood_values)
-    return StateWithLogLikelihood(
+    return NSState(
         position, logprior_values, loglikelihood_values, loglikelihood_birth_values
     )
 
@@ -147,7 +130,7 @@ def init(
         distribution. The leading dimension of each leaf array must be equal to
         the number of positions.
     init_state_fn
-        A function that initializes a StateWithLogLikelihood from positions.
+        A function that initializes an NSState from positions.
     loglikelihood_birth
         The initial log-likelihood birth threshold. Defaults to NaN, which
         implies no initial likelihood constraint beyond the prior.
@@ -158,9 +141,7 @@ def init(
         The initial state of the Nested Sampler.
     """
     loglikelihood_birth_array = loglikelihood_birth * jnp.ones(len(positions))
-    state = init_state_fn(positions, loglikelihood_birth=loglikelihood_birth_array)
-    inner_kernel_params: Dict = {}
-    return NSState(state, inner_kernel_params)
+    return init_state_fn(positions, loglikelihood_birth=loglikelihood_birth_array)
 
 
 def build_kernel(
@@ -185,8 +166,6 @@ def build_kernel(
     5. The prior volume `logX` and evidence `logZ` are updated based on the
        number of deleted particles and their likelihoods.
 
-    This base version does not adapt the kernel parameters.
-
     Parameters
     ----------
     delete_fn
@@ -204,35 +183,33 @@ def build_kernel(
     -------
     Callable
         A kernel function for Nested Sampling:
-        `(rng_key, state) -> (new_state, ns_info)`.
+        `(rng_key, state, inner_kernel_params) -> (new_state, ns_info)`.
     """
 
-    def kernel(rng_key: PRNGKey, state: NSState) -> tuple[NSState, NSInfo]:
+    def kernel(
+        rng_key: PRNGKey, state: NSState, inner_kernel_params: Dict
+    ) -> tuple[NSState, NSInfo]:
         # Delete, and grab all the dead information
         rng_key, delete_fn_key = jax.random.split(rng_key)
         dead_idx, target_update_idx, start_idx = delete_fn(delete_fn_key, state)
-        dead_particles = jax.tree.map(lambda x: x[dead_idx], state.particles)
+        dead_particles = jax.tree.map(lambda x: x[dead_idx], state)
 
         # Resample the live particles
         sample_keys = jax.random.split(rng_key, len(start_idx))
-        inner_state = jax.tree.map(lambda x: x[start_idx], state.particles)
+        inner_state = jax.tree.map(lambda x: x[start_idx], state)
         loglikelihood_0 = dead_particles.loglikelihood.max()
         new_inner_state, inner_update_info = inner_kernel(
-            sample_keys, inner_state, loglikelihood_0, state.inner_kernel_params
+            sample_keys, inner_state, loglikelihood_0, inner_kernel_params
         )
 
         # Update the particles
-        new_particles = jax.tree_util.tree_map(
+        new_state = jax.tree_util.tree_map(
             lambda p, n: p.at[target_update_idx].set(n),
-            state.particles,
+            state,
             new_inner_state,
         )
 
         # Return updated state and info
-        new_state = NSState(
-            new_particles,
-            state.inner_kernel_params,
-        )
         info = NSInfo(
             dead_particles,
             inner_update_info,
@@ -275,7 +252,7 @@ def delete_fn(
         - `start_idx`: An array of indices corresponding to the particles
             selected for initialization.
     """
-    loglikelihood = state.particles.loglikelihood
+    loglikelihood = state.loglikelihood
     neg_dead_loglikelihood, dead_idx = jax.lax.top_k(-loglikelihood, num_delete)
     constraint_loglikelihood = loglikelihood > -neg_dead_loglikelihood.min()
     weights = jnp.array(constraint_loglikelihood, dtype=loglikelihood.dtype)
