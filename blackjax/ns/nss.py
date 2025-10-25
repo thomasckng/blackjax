@@ -69,7 +69,7 @@ def compute_covariance_from_particles(
     inner_kernel_params: Optional[Dict[str, ArrayTree]] = None,
 ) -> Dict[str, ArrayTree]:
     """Compute empirical covariance from current particles for direction proposal."""
-    return {"cov": jnp.atleast_2d(particles_covariance_matrix(state.particles))}
+    return {"cov": jnp.atleast_2d(particles_covariance_matrix(state.particles.position))}
 
 
 def build_kernel(
