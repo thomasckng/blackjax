@@ -32,11 +32,11 @@ def update_with_mcmc_take_last(
         def mcmc_kernel(rng_key, state):
             def body_fn(state, rng_key):
                 new_state, info = shared_mcmc_step_fn(rng_key, state)
-                return new_state, (new_state, info)
+                return new_state, info  # (new_state, info)
 
             keys = jax.random.split(rng_key, num_mcmc_steps)
             final_state, infos = jax.lax.scan(body_fn, state, keys)
-            return final_state, infos[1]  # MCMCUpdateInfo(infos[0], infos[1])
+            return final_state, infos  # MCMCUpdateInfo(infos[0], infos[1])
 
         return jax.vmap(mcmc_kernel)(rng_key, state)
 
