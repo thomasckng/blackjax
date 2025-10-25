@@ -57,9 +57,6 @@ class NSState(NamedTuple):
         This is used for reconstructing the nested sampling path.
     logprior
         An array of log-prior values, one for each live particle.
-    pid
-        Particle ID. An array of integers tracking the identity or lineage of
-        particles, primarily for diagnostic purposes.
     logX
         The log of the current prior volume estimate.
     logZ
@@ -74,7 +71,6 @@ class NSState(NamedTuple):
     loglikelihood: Array  # The log-likelihood of the particles
     loglikelihood_birth: Array  # The log-likelihood threshold at particle birth
     logprior: Array  # The log-prior density of the particles
-    pid: Array  # particle IDs
     logX: Array  # The current log-volume estimate
     logZ: Array  # The accumulated evidence estimate
     logZ_live: Array  # The current evidence estimate
@@ -194,7 +190,6 @@ def init(
     loglikelihood = state.loglikelihood
     loglikelihood_birth = loglikelihood_birth * jnp.ones_like(loglikelihood)
     logprior = state.logdensity
-    pid = jnp.arange(len(loglikelihood), dtype=jnp.int32)
     dtype = loglikelihood.dtype
     logX = jnp.array(logX, dtype=dtype)
     logZ = jnp.array(logZ, dtype=dtype)
@@ -205,7 +200,6 @@ def init(
         loglikelihood,
         loglikelihood_birth,
         logprior,
-        pid,
         logX,
         logZ,
         logZ_live,
@@ -294,7 +288,6 @@ def build_kernel(
             loglikelihood_0
         )
         logprior = state.logprior.at[target_update_idx].set(new_inner_state.logdensity)
-        pid = state.pid.at[target_update_idx].set(state.pid[start_idx])
 
         # Update the run-time information
         logX, logZ, logZ_live = update_ns_runtime_info(
@@ -307,7 +300,6 @@ def build_kernel(
             loglikelihood,
             loglikelihood_birth,
             logprior,
-            pid,
             logX,
             logZ,
             logZ_live,
