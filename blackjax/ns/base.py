@@ -136,8 +136,9 @@ def init_state_strategy(
     """
     logprior_values = logprior_fn(position)
     loglikelihood_values = loglikelihood_fn(position)
+    loglikelihood_birth_values = loglikelihood_birth * jnp.ones_like(loglikelihood_values)
     return StateWithLogLikelihood(
-        position, logprior_values, loglikelihood_values, loglikelihood_birth
+        position, logprior_values, loglikelihood_values, loglikelihood_birth_values
     )
 
 
