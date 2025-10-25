@@ -95,7 +95,7 @@ class NSInfo(NamedTuple):
         The birth log-likelihood thresholds of the dead particles.
     logprior
         The log-prior values of the dead particles.
-    inner_kernel_info
+    update_info
         A NamedTuple (or any PyTree) containing information from the update step
         (inner kernel) used to generate new live particles. The content
         depends on the specific inner kernel used.
@@ -105,10 +105,10 @@ class NSInfo(NamedTuple):
     loglikelihood: Array  # The log-likelihood of the particles
     loglikelihood_birth: Array  # The log-likelihood threshold at particle birth
     logprior: Array  # The log-prior density of the particles
-    inner_kernel_info: NamedTuple  # Information from the inner kernel update step
+    update_info: NamedTuple
 
 
-class PartitionedState(NamedTuple):
+class StateWithLogLikelihood(NamedTuple):
     """State container that partitions out the loglikelihood and logprior.
 
     This intermediate construction wraps around the usual State of an MCMC chain
@@ -131,45 +131,38 @@ class PartitionedState(NamedTuple):
     """
 
     position: ArrayLikeTree  # Current positions of particles in the inner kernel
-    logprior: Array  # Log-prior values for particles in the inner kernel
+    logdensity: Array  # Log-prior values for particles in the inner kernel
     loglikelihood: Array  # Log-likelihood values for particles in the inner kernel
 
 
-class PartitionedInfo(NamedTuple):
-    """Transition information that additionally records a partitioned loglikelihood
-    and logprior.
+def init_state_strategy(
+    position: ArrayLikeTree, logprior_fn: Callable, loglikelihood_fn: Callable
+) -> StateWithLogLikelihood:
+    """The default initialisation strategy for each state.
 
-    See PartitionedState
-
-    Attributes
+    Parameters
     ----------
     position
-        A PyTree of arrays representing the final positions after the transition step.
-        Structure matches the input particle positions.
+        A PyTree of arrays representing the initial positions of the particles.
+        Each leaf array has a leading dimension corresponding to the number of particles.
     logprior
-        An array of log-prior density values at the final positions.
-        Kept separate to support posterior repartitioning schemes.
-        Shape: (n_particles,)
+        A function that computes the log-prior density for a single particle.
     loglikelihood
-        An array of log-likelihood values at the final positions.
-        Kept separate to support posterior repartitioning schemes.
-        Shape: (n_particles,)
-    info
-        Additional transition-specific diagnostic information from the step.
-        The content and structure depend on the specific transition implementation
-        (e.g., acceptance rates, step sizes, number of evaluations, etc.).
-    """
+        A function that computes the log-likelihood for a single particle.
 
-    position: ArrayTree
-    logprior: ArrayTree
-    loglikelihood: ArrayTree
-    info: NamedTuple
+    Returns
+    -------
+    PartitionedState
+        The initialized state containing positions, log-prior, and log-likelihood.
+    """
+    logprior_values = logprior_fn(position)
+    loglikelihood_values = loglikelihood_fn(position)
+    return StateWithLogLikelihood(position, logprior_values, loglikelihood_values)
 
 
 def init(
     particles: ArrayLikeTree,
-    logprior_fn: Callable,
-    loglikelihood_fn: Callable,
+    init_state_fn: Callable,
     loglikelihood_birth: Array = -jnp.nan,
     logX: Optional[Array] = 0.0,
     logZ: Optional[Array] = -jnp.inf,
@@ -182,10 +175,8 @@ def init(
         An initial set of particles (PyTree of arrays) drawn from the prior
         distribution. The leading dimension of each leaf array must be equal to
         the number of particles.
-    logprior_fn
-        A function that computes the log-prior of a single particle.
-    loglikelihood_fn
-        A function that computes the log-likelihood of a single particle.
+    init_state_fn
+        A function that initializes a StateWithLogLikelihood from particles.
     loglikelihood_birth
         The initial log-likelihood birth threshold. Defaults to -NaN, which
         implies no initial likelihood constraint beyond the prior.
@@ -199,9 +190,10 @@ def init(
     NSState
         The initial state of the Nested Sampler.
     """
-    loglikelihood = loglikelihood_fn(particles)
+    state = init_state_fn(particles)
+    loglikelihood = state.loglikelihood
     loglikelihood_birth = loglikelihood_birth * jnp.ones_like(loglikelihood)
-    logprior = logprior_fn(particles)
+    logprior = state.logdensity
     pid = jnp.arange(len(loglikelihood), dtype=jnp.int32)
     dtype = loglikelihood.dtype
     logX = jnp.array(logX, dtype=dtype)
@@ -222,8 +214,6 @@ def init(
 
 
 def build_kernel(
-    logprior_fn: Callable,
-    loglikelihood_fn: Callable,
     delete_fn: Callable,
     inner_kernel: Callable,
 ) -> Callable:
@@ -249,10 +239,6 @@ def build_kernel(
 
     Parameters
     ----------
-    logprior_fn
-        A function that computes the log-prior probability of a single particle.
-    loglikelihood_fn
-        A function that computes the log-likelihood of a single particle.
     delete_fn
         this particle deletion function has the signature
         `(rng_key, current_state) -> (dead_idx, target_update_idx, start_idx)`
@@ -261,7 +247,7 @@ def build_kernel(
         for new particle generation.
     inner_kernel
         This kernel function has the signature
-        `(rng_key, inner_state, logprior_fn, loglikelihood_fn, loglikelihood_0, params) -> (new_inner_state, inner_info)`,
+        `(rng_keys, inner_state, loglikelihood_0, params) -> (new_inner_state, inner_info)`,
         and is used to generate new particles.
 
     Returns
@@ -287,12 +273,10 @@ def build_kernel(
         particles = jax.tree.map(lambda x: x[start_idx], state.particles)
         logprior = state.logprior[start_idx]
         loglikelihood = state.loglikelihood[start_idx]
-        inner_state = PartitionedState(particles, logprior, loglikelihood)
-        new_inner_state, inner_info = inner_kernel(
+        inner_state = StateWithLogLikelihood(particles, logprior, loglikelihood)
+        new_inner_state, inner_update_info = inner_kernel(
             sample_keys,
             inner_state,
-            logprior_fn,
-            loglikelihood_fn,
             loglikelihood_0,
             state.inner_kernel_params,
         )
@@ -309,7 +293,7 @@ def build_kernel(
         loglikelihood_birth = state.loglikelihood_birth.at[target_update_idx].set(
             loglikelihood_0
         )
-        logprior = state.logprior.at[target_update_idx].set(new_inner_state.logprior)
+        logprior = state.logprior.at[target_update_idx].set(new_inner_state.logdensity)
         pid = state.pid.at[target_update_idx].set(state.pid[start_idx])
 
         # Update the run-time information
@@ -334,7 +318,7 @@ def build_kernel(
             dead_loglikelihood,
             dead_loglikelihood_birth,
             dead_logprior,
-            inner_info,
+            inner_update_info,
         )
         return state, info
 
@@ -395,7 +379,9 @@ def update_ns_runtime_info(
 ) -> tuple[Array, Array, Array]:
     num_particles = len(loglikelihood)
     num_deleted = len(dead_loglikelihood)
-    num_live = jnp.arange(num_particles, num_particles - num_deleted, -1, dtype=loglikelihood.dtype)
+    num_live = jnp.arange(
+        num_particles, num_particles - num_deleted, -1, dtype=loglikelihood.dtype
+    )
     delta_logX = -1 / num_live
     logX = logX + jnp.cumsum(delta_logX)
     log_delta_X = logX + jnp.log(1 - jnp.exp(delta_logX))

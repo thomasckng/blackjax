@@ -36,8 +36,7 @@ __all__ = ["init", "build_kernel"]
 
 def init(
     particles: ArrayLikeTree,
-    logprior_fn: Callable,
-    loglikelihood_fn: Callable,
+    init_state_fn: Callable,
     loglikelihood_birth: Array = -jnp.nan,
     update_inner_kernel_params_fn: Optional[Callable] = None,
 ) -> NSState:
@@ -49,10 +48,8 @@ def init(
         An initial set of particles (PyTree of arrays) drawn from the prior
         distribution. The leading dimension of each leaf array must be equal to
         the number of particles.
-    loglikelihood_fn
-        A function that computes the log-likelihood of a single particle.
-    logprior_fn
-        A function that computes the log-prior of a single particle.
+    init_state_fn
+        A function that initializes a StateWithLogLikelihood from particles.
     loglikelihood_birth
         The initial log-likelihood birth threshold. Defaults to -NaN, which
         implies no initial likelihood constraint beyond the prior.
@@ -66,7 +63,7 @@ def init(
     NSState
         The initial state of the Nested Sampler.
     """
-    state = base_init(particles, logprior_fn, loglikelihood_fn, loglikelihood_birth)
+    state = base_init(particles, init_state_fn, loglikelihood_birth)
     if update_inner_kernel_params_fn is not None:
         inner_kernel_params = update_inner_kernel_params_fn(state, None, {})
         state = state._replace(inner_kernel_params=inner_kernel_params)
@@ -74,8 +71,6 @@ def init(
 
 
 def build_kernel(
-    logprior_fn: Callable,
-    loglikelihood_fn: Callable,
     delete_fn: Callable,
     inner_kernel: Callable,
     update_inner_kernel_params_fn: Callable[
@@ -91,10 +86,6 @@ def build_kernel(
 
     Parameters
     ----------
-    logprior_fn
-        A function that computes the log-prior probability of a single particle.
-    loglikelihood_fn
-        A function that computes the log-likelihood of a single particle.
     delete_fn
         this particle deletion function has the signature
         `(rng_key, current_state) -> (dead_idx, target_update_idx, start_idx)`
@@ -103,7 +94,7 @@ def build_kernel(
         for new particle generation.
     inner_kernel
         This kernel function has the signature
-        `(rng_key, inner_state, logprior_fn, loglikelihood_fn, loglikelihood_0, inner_kernel_params) -> (new_inner_state, inner_info)`,
+        `(rng_keys, inner_state, loglikelihood_0, inner_kernel_params) -> (new_inner_state, inner_info)`,
         and is used to generate new particles.
     update_inner_kernel_params_fn
         A function that takes the `NSState`, `NSInfo` from the completed NS
@@ -119,8 +110,6 @@ def build_kernel(
     """
 
     base_kernel = base_build_kernel(
-        logprior_fn,
-        loglikelihood_fn,
         delete_fn,
         inner_kernel,
     )

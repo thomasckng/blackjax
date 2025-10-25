@@ -150,8 +150,9 @@ def logX(rng_key: PRNGKey, dead_info: NSInfo, shape: int = 100) -> tuple[Array, 
     min_val = jnp.finfo(dead_info.loglikelihood.dtype).tiny
     r = jnp.log(
         jax.random.uniform(
-            subkey, shape=(dead_info.loglikelihood.shape[0], shape),
-            dtype=dead_info.loglikelihood.dtype
+            subkey,
+            shape=(dead_info.loglikelihood.shape[0], shape),
+            dtype=dead_info.loglikelihood.dtype,
         ).clip(min_val, 1 - min_val)
     )
 
@@ -159,8 +160,12 @@ def logX(rng_key: PRNGKey, dead_info: NSInfo, shape: int = 100) -> tuple[Array, 
     t = r / num_live[:, jnp.newaxis]
     logX = jnp.cumsum(t, axis=0)
 
-    logXp = jnp.concatenate([jnp.zeros((1, logX.shape[1]), dtype=logX.dtype), logX[:-1]], axis=0)
-    logXm = jnp.concatenate([logX[1:], jnp.full((1, logX.shape[1]), -jnp.inf, dtype=logX.dtype)], axis=0)
+    logXp = jnp.concatenate(
+        [jnp.zeros((1, logX.shape[1]), dtype=logX.dtype), logX[:-1]], axis=0
+    )
+    logXm = jnp.concatenate(
+        [logX[1:], jnp.full((1, logX.shape[1]), -jnp.inf, dtype=logX.dtype)], axis=0
+    )
     log_diff = logXm - logXp
     logdX = log1mexp(log_diff) + logXp - jnp.log(2)
     return logX, logdX
@@ -237,7 +242,7 @@ def finalise(live: NSState, dead: list[NSInfo]) -> NSInfo:
             live.loglikelihood,
             live.loglikelihood_birth,
             live.logprior,
-            dead[-1].inner_kernel_info,
+            dead[-1].update_info,
         )
     ]
     combined_dead_info = jax.tree.map(

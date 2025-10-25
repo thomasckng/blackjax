@@ -250,6 +250,7 @@ def horizontal_slice(
 
 def build_hrss_kernel(
     cov: Array,
+    init_fn: Callable = init,
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> Callable:
@@ -264,6 +265,8 @@ def build_hrss_kernel(
     ----------
     cov
         The covariance matrix used by the direction proposal function
+    init_fn
+        A function initializing a SliceState
     max_steps
         The maximum number of steps to take when expanding the interval in
         each direction during the stepping-out phase.
@@ -286,7 +289,7 @@ def build_hrss_kernel(
         def slice_fn(t):
             x = jax.tree.map(lambda x, d: x + t * d, state.position, d)
             is_accepted = True
-            new_state = init(x, logdensity_fn)
+            new_state = init_fn(x, logdensity_fn)
             return new_state, is_accepted
 
         slice_kernel = build_kernel(slice_fn, max_steps, max_shrinkage)
@@ -341,6 +344,7 @@ def sample_direction_from_covariance(
 def hrss_as_top_level_api(
     logdensity_fn: Callable,
     cov: Array,
+    init_fn: Callable = init,
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> SamplingAlgorithm:
@@ -358,6 +362,8 @@ def hrss_as_top_level_api(
         The covariance matrix used by the direction proposal function
         (`sample_direction_from_covariance`). This matrix shapes the random
         directions proposed for the slice sampling steps.
+    init_fn
+        A function initializing a SliceState
     max_steps
         The maximum number of steps to take when expanding the interval in
         each direction during the stepping-out phase.
@@ -370,7 +376,7 @@ def hrss_as_top_level_api(
         A `SamplingAlgorithm` tuple containing `init` and `step` functions for
         the configured Hit-and-Run Slice Sampler.
     """
-    kernel = build_hrss_kernel(cov, max_steps, max_shrinkage)
-    init_fn = partial(init, logdensity_fn=logdensity_fn)
+    kernel = build_hrss_kernel(cov, init_fn, max_steps, max_shrinkage)
+    init_fn = partial(init_fn, logdensity_fn=logdensity_fn)
     step_fn = partial(kernel, logdensity_fn=logdensity_fn)
     return SamplingAlgorithm(init_fn, step_fn)
