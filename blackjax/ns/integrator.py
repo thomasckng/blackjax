@@ -24,7 +24,7 @@ from typing import NamedTuple
 import jax.numpy as jnp
 from jax.scipy.special import logsumexp
 
-from blackjax.ns.base import NSInfo, NSState
+from blackjax.ns.base import StateWithLogLikelihood
 from blackjax.types import Array
 
 __all__ = ["NSIntegrator", "init_integrator", "update_integrator"]
@@ -53,12 +53,12 @@ class NSIntegrator(NamedTuple):
     logZ_live: Array
 
 
-def init_integrator(live_state: NSState) -> NSIntegrator:
+def init_integrator(particle_state: StateWithLogLikelihood) -> NSIntegrator:
     """Initialize the evidence integrator from the initial live points.
 
     Parameters
     ----------
-    live_state
+    particle_state
         The initial NSState containing the live particles.
 
     Returns
@@ -67,15 +67,17 @@ def init_integrator(live_state: NSState) -> NSIntegrator:
         The initial integrator with logX=0, logZ=-inf, and logZ_live computed
         from the initial live points.
     """
-    dtype = live_state.loglikelihood.dtype
+    dtype = particle_state.loglikelihood.dtype
     logX = jnp.array(0.0, dtype=dtype)
     logZ = jnp.array(-jnp.inf, dtype=dtype)
-    logZ_live = _logmeanexp(live_state.loglikelihood) + logX
+    logZ_live = _logmeanexp(particle_state.loglikelihood) + logX
     return NSIntegrator(logX, logZ, logZ_live)
 
 
 def update_integrator(
-    integrator: NSIntegrator, live_state: NSState, dead_info: NSInfo
+    integrator: NSIntegrator,
+    particle_state: StateWithLogLikelihood,
+    dead_particles: StateWithLogLikelihood,
 ) -> NSIntegrator:
     """Update the evidence integrator after a Nested Sampling step.
 
@@ -93,8 +95,8 @@ def update_integrator(
     NSIntegrator
         The updated integrator with new logX, logZ, and logZ_live.
     """
-    loglikelihood = live_state.loglikelihood
-    dead_loglikelihood = dead_info.particles.loglikelihood
+    loglikelihood = particle_state.loglikelihood
+    dead_loglikelihood = dead_particles.loglikelihood
 
     num_particles = len(loglikelihood)
     num_deleted = len(dead_loglikelihood)

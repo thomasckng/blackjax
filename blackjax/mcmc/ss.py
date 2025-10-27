@@ -335,8 +335,8 @@ def sample_direction_from_covariance(
     u = jax.random.normal(rng_key, shape=p.shape, dtype=p.dtype)
     u /= jnp.linalg.norm(u)
     L = jnp.linalg.cholesky(cov).astype(p.dtype)
-    dim = cov.shape[0]
-    L = L * 2 * jnp.sqrt(dim + 2)
+    # dim = cov.shape[0]
+    L = L * 2
     d = linear_map(L, u)
     return unravel_fn(d)
 

@@ -29,15 +29,21 @@ This base implementation uses a provided kernel to perform the constrained
 sampling.
 """
 
-from typing import Callable, Dict, NamedTuple, Optional
+from typing import Callable, Dict, NamedTuple
 
 import jax
 import jax.numpy as jnp
-from jax.scipy.special import logsumexp
 
-from blackjax.types import Array, ArrayLikeTree, ArrayTree, PRNGKey
+from blackjax.types import Array, ArrayLikeTree, PRNGKey
 
 __all__ = ["init", "build_kernel", "NSState", "NSInfo", "delete_fn"]
+
+
+class StateWithLogLikelihood(NamedTuple):
+    position: ArrayLikeTree
+    logdensity: Array
+    loglikelihood: Array
+    loglikelihood_birth: Array
 
 
 class NSState(NamedTuple):
@@ -60,10 +66,7 @@ class NSState(NamedTuple):
         when they were sampled (i.e., their birth likelihood contours).
     """
 
-    position: ArrayLikeTree
-    logdensity: Array
-    loglikelihood: Array
-    loglikelihood_birth: Array
+    particles: StateWithLogLikelihood
 
 
 class NSInfo(NamedTuple):
@@ -88,7 +91,7 @@ def init_state_strategy(
     logprior_fn: Callable,
     loglikelihood_fn: Callable,
     loglikelihood_birth: Array = jnp.nan,
-) -> NSState:
+) -> StateWithLogLikelihood:
     """The default initialisation strategy for each state.
 
     Parameters
@@ -110,8 +113,11 @@ def init_state_strategy(
     """
     logprior_values = logprior_fn(position)
     loglikelihood_values = loglikelihood_fn(position)
-    loglikelihood_birth_values = loglikelihood_birth * jnp.ones_like(loglikelihood_values)
-    return NSState(
+    loglikelihood_birth_values = loglikelihood_birth * jnp.ones_like(
+        loglikelihood_values
+    )
+
+    return StateWithLogLikelihood(
         position, logprior_values, loglikelihood_values, loglikelihood_birth_values
     )
 
@@ -140,8 +146,11 @@ def init(
     NSState
         The initial state of the Nested Sampler.
     """
-    loglikelihood_birth_array = loglikelihood_birth * jnp.ones(len(positions))
-    return init_state_fn(positions, loglikelihood_birth=loglikelihood_birth_array)
+    state_init = init_state_fn(positions)
+    loglikelihood_birth_array = loglikelihood_birth * jnp.ones_like(
+        state_init.loglikelihood_birth
+    )
+    return NSState(state_init._replace(loglikelihood_birth=loglikelihood_birth_array))
 
 
 def build_kernel(
@@ -191,22 +200,26 @@ def build_kernel(
     ) -> tuple[NSState, NSInfo]:
         # Delete, and grab all the dead information
         rng_key, delete_fn_key = jax.random.split(rng_key)
-        dead_idx, target_update_idx, start_idx = delete_fn(delete_fn_key, state)
-        dead_particles = jax.tree.map(lambda x: x[dead_idx], state)
+        dead_idx, target_update_idx, start_idx = delete_fn(
+            delete_fn_key, state.particles
+        )
+        dead_particles = jax.tree.map(lambda x: x[dead_idx], state.particles)
 
         # Resample the live particles
         sample_keys = jax.random.split(rng_key, len(start_idx))
-        inner_state = jax.tree.map(lambda x: x[start_idx], state)
+        inner_state = jax.tree.map(lambda x: x[start_idx], state.particles)
         loglikelihood_0 = dead_particles.loglikelihood.max()
         new_inner_state, inner_update_info = inner_kernel(
             sample_keys, inner_state, loglikelihood_0, inner_kernel_params
         )
 
         # Update the particles
-        new_state = jax.tree_util.tree_map(
-            lambda p, n: p.at[target_update_idx].set(n),
-            state,
-            new_inner_state,
+        state = state._replace(
+            particles=jax.tree_util.tree_map(
+                lambda p, n: p.at[target_update_idx].set(n),
+                state.particles,
+                new_inner_state,
+            )
         )
 
         # Return updated state and info
@@ -214,13 +227,13 @@ def build_kernel(
             dead_particles,
             inner_update_info,
         )
-        return new_state, info
+        return state, info
 
     return kernel
 
 
 def delete_fn(
-    rng_key: PRNGKey, state: NSState, num_delete: int
+    rng_key: PRNGKey, state: StateWithLogLikelihood, num_delete: int
 ) -> tuple[Array, Array, Array]:
     """Identifies particles to be deleted and selects live particles for resampling.
 
@@ -266,5 +279,3 @@ def delete_fn(
     )
     target_update_idx = dead_idx
     return dead_idx, target_update_idx, start_idx
-
-

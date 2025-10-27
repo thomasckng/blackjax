@@ -25,10 +25,10 @@ import jax.numpy as jnp
 from blackjax import SamplingAlgorithm
 from blackjax.mcmc.ss import build_kernel as build_slice_kernel
 from blackjax.mcmc.ss import sample_direction_from_covariance
+from blackjax.ns.adaptive import build_kernel as build_adaptive_kernel
+from blackjax.ns.adaptive import init
 from blackjax.ns.base import NSInfo, NSState
-from blackjax.ns.base import build_kernel as build_base_kernel
 from blackjax.ns.base import delete_fn as default_delete_fn
-from blackjax.ns.base import init
 from blackjax.ns.base import init_state_strategy
 from blackjax.ns.from_mcmc import update_with_mcmc_take_last
 from blackjax.smc.tuning.from_particles import particles_covariance_matrix
@@ -81,7 +81,7 @@ def init_inner_kernel_params(state: NSState) -> Dict[str, ArrayTree]:
     Dict[str, ArrayTree]
         Dictionary containing initial 'cov' (covariance matrix).
     """
-    return {"cov": jnp.atleast_2d(particles_covariance_matrix(state.position))}
+    return {"cov": jnp.atleast_2d(particles_covariance_matrix(state.particles))}
 
 
 def update_inner_kernel_params(
@@ -108,7 +108,9 @@ def update_inner_kernel_params(
     Dict[str, ArrayTree]
         Dictionary containing updated 'cov' (covariance matrix).
     """
-    return {"cov": jnp.atleast_2d(particles_covariance_matrix(state.position))}
+    return {
+        "cov": jnp.atleast_2d(particles_covariance_matrix(state.particles.position))
+    }
 
 
 def build_kernel(
@@ -117,6 +119,8 @@ def build_kernel(
     num_delete: int = 1,
     stepper_fn: Callable = default_stepper_fn,
     generate_slice_direction_fn: Callable = sample_direction_from_covariance,
+    update_inner_kernel_params_fn: Callable = update_inner_kernel_params,
+    delete_fn: Callable = default_delete_fn,
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> Callable:
@@ -148,9 +152,13 @@ def build_kernel(
         constrained_mcmc_slice_fn, num_inner_steps
     )
 
-    delete_fn = partial(default_delete_fn, num_delete=num_delete)
+    delete_fn = partial(delete_fn, num_delete=num_delete)
 
-    kernel = build_base_kernel(delete_fn, inner_kernel)
+    kernel = build_adaptive_kernel(
+        delete_fn,
+        inner_kernel,
+        update_inner_kernel_params_fn=update_inner_kernel_params_fn,
+    )
     return kernel
 
 
@@ -162,6 +170,8 @@ def as_top_level_api(
     stepper_fn: Callable = default_stepper_fn,
     generate_slice_direction_fn: Callable = sample_direction_from_covariance,
     init_state_strategy_fn: Callable = init_state_strategy,
+    update_inner_kernel_params_fn: Callable = update_inner_kernel_params,
+    delete_fn: Callable = default_delete_fn,
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> SamplingAlgorithm:
@@ -220,6 +230,8 @@ def as_top_level_api(
         num_delete,
         stepper_fn=stepper_fn,
         generate_slice_direction_fn=generate_slice_direction_fn,
+        update_inner_kernel_params_fn=update_inner_kernel_params_fn,
+        delete_fn=delete_fn,
         max_steps=max_steps,
         max_shrinkage=max_shrinkage,
     )
@@ -230,9 +242,10 @@ def as_top_level_api(
         return init(
             position,
             init_state_fn=jax.vmap(init_state_fn),
+            update_inner_kernel_params_fn=update_inner_kernel_params_fn,
         )
 
-    def step_fn(rng_key, state, inner_kernel_params):
-        return kernel(rng_key, state, inner_kernel_params)
+    def step_fn(rng_key, state):
+        return kernel(rng_key, state)
 
     return SamplingAlgorithm(init_fn, step_fn)
