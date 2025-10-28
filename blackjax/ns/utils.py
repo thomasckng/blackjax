@@ -18,13 +18,12 @@ Sampling, such as calculating log-volumes, log-weights, effective sample sizes,
 and post-processing of results.
 """
 
-import functools
 from typing import Callable, Dict, Tuple
 
 import jax
 import jax.numpy as jnp
 
-from blackjax.ns.base import NSInfo, NSState
+from blackjax.ns.base import NSInfo
 from blackjax.types import Array, ArrayTree, PRNGKey
 
 
@@ -147,15 +146,12 @@ def logX(rng_key: PRNGKey, dead_info: NSInfo, shape: int = 100) -> tuple[Array, 
           `dX_i` is approximately `X_i - X_{i+1}`.
     """
     rng_key, subkey = jax.random.split(rng_key)
-    min_val = jnp.finfo(dead_info.particles.loglikelihood.dtype).tiny
-    r = jnp.log(
-        jax.random.uniform(
-            subkey,
-            shape=(dead_info.particles.loglikelihood.shape[0], shape),
-            dtype=dead_info.particles.loglikelihood.dtype,
-        ).clip(min_val, 1 - min_val)
+    u = jax.random.uniform(
+        subkey,
+        shape=(dead_info.particles.loglikelihood.shape[0], shape),
+        dtype=dead_info.particles.loglikelihood.dtype,
     )
-
+    r = jax.lax.log1p(jax.lax.neg(u))
     num_live = compute_num_live(dead_info)
     t = r / num_live[:, jnp.newaxis]
     logX = jnp.cumsum(t, axis=0)
@@ -210,7 +206,7 @@ def log_weights(
     return log_w[unsort_indices]
 
 
-def finalise(live: NSState, dead: list[NSInfo]) -> NSInfo:
+def finalise(live: ArrayTree, dead: list[NSInfo], update_info: bool = True) -> NSInfo:
     """Combines the history of dead particle information with the final live points.
 
     At the end of a Nested Sampling run, the remaining live points are treated
@@ -236,18 +232,19 @@ def finalise(live: NSState, dead: list[NSInfo]) -> NSInfo:
         for the final live points' `update_info` (as a placeholder).
     """
 
-    all_pytrees_to_combine = dead + [
-        NSInfo(
-            live.particles,
-            dead[-1].update_info,
+    if update_info:
+        update_infos = [d.update_info for d in dead]
+        final_update_info = jax.tree_util.tree_map(
+            lambda *xs: jnp.concatenate(xs, axis=0), *update_infos
         )
-    ]
-    combined_dead_info = jax.tree.map(
-        lambda *args: jnp.concatenate(args),
-        all_pytrees_to_combine[0],
-        *all_pytrees_to_combine[1:],
+    else:
+        final_update_info = None
+
+    particles = [d.particles for d in dead] + [live.particles]
+    final_particles = jax.tree_util.tree_map(
+        lambda *xs: jnp.concatenate(xs, axis=0), *particles
     )
-    return combined_dead_info
+    return NSInfo(final_particles, final_update_info)
 
 
 def ess(rng_key: PRNGKey, dead_info_map: NSInfo) -> Array:
@@ -333,23 +330,6 @@ def get_first_row(x: ArrayTree) -> ArrayTree:
         first slice `leaf[0]` of the corresponding leaf in `x`.
     """
     return jax.tree.map(lambda x: x[0], x)
-
-
-def repeat_kernel(num_repeats: int):
-    """Decorator to repeat a kernel function multiple times."""
-
-    def decorator(kernel):
-        @functools.wraps(kernel)
-        def repeated_kernel(rng_key: PRNGKey, state, *args, **kwargs):
-            def body_fn(state, rng_key):
-                return kernel(rng_key, state, *args, **kwargs)
-
-            keys = jax.random.split(rng_key, num_repeats)
-            return jax.lax.scan(body_fn, state, keys)
-
-        return repeated_kernel
-
-    return decorator
 
 
 def uniform_prior(
