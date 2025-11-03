@@ -11,11 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Utility functions for Nested Sampling.
-
-This module provides helper functions for common tasks associated with Nested
-Sampling, such as calculating log-volumes, log-weights, effective sample sizes,
-and post-processing of results.
+"""Utility functions for Nested Sampling post-processing.
 """
 
 from typing import Callable, Dict, Tuple
@@ -23,33 +19,12 @@ from typing import Callable, Dict, Tuple
 import jax
 import jax.numpy as jnp
 
-from blackjax.ns.base import NSInfo
+from blackjax.ns.base import NSInfo, NSState
 from blackjax.types import Array, ArrayTree, PRNGKey
 
 
 def log1mexp(x: Array) -> Array:
-    """Computes log(1 - exp(x)) in a numerically stable way.
-
-    This function implements the algorithm from Mächler (2012) [1]_ for computing
-    log(1 - exp(x)) while avoiding precision issues, especially when x is close to 0.
-
-    Parameters
-    ----------
-    x
-        Input array or scalar. Values in x should be less than or equal to 0;
-        the function returns `jnp.nan` for `x > 0`.
-
-    Returns
-    -------
-    Array
-        The value of log(1 - exp(x)).
-
-    References
-    ----------
-    .. [1] Mächler, M. (2012). Accurately computing log(1-exp(-|a|)).
-           CRAN R project, package Rmpfr, vignette log1mexp-note.pdf.
-           https://cran.r-project.org/web/packages/Rmpfr/vignettes/log1mexp-note.pdf
-    """
+    """Computes log(1 - exp(x)) in a numerically stable way."""
     return jnp.where(
         x > -0.6931472,  # approx log(2)
         jnp.log(-jnp.expm1(x)),
@@ -60,27 +35,9 @@ def log1mexp(x: Array) -> Array:
 def compute_num_live(info: NSInfo) -> Array:
     """Compute the effective number of live points at each death contour.
 
-    In Nested Sampling, especially with batch deletions (k > 1), the conceptual
-    number of live points changes with each individual particle considered "dead"
-    within that batch.
-
-    The function works by:
-    1. Creating "birth" events (particle added to live set, count +1) and "death"
-       events (particle removed, count -1).
-    2. Sorting all events by their log-likelihood. In case of ties, birth events
-       can be processed before death events by sorting on the count type (1 before -1),
-       though the primary sort is logL.
-    3. Computing the cumulative sum of these +1/-1 counts. This gives the number
-       of particles with log-likelihood greater than or equal to the current event's logL.
-    4. For each death event, this cumulative sum (plus 1, because the dead particle itself
-       was live just before its "death") represents `m*_i`.
-
-    Parameters
-    ----------
-    info
-        An `NSInfo` object (or a PyTree with compatible `loglikelihood_birth`
-        and `loglikelihood` fields, typically from a concatenated history of NS steps)
-        containing the birth and death log-likelihoods of particles.
+    When doing batch deletions, the jump in energy level can be smoothed by
+    transforming 1 jump of size k into k jumps of size 1. This function computes
+    the effective population size associated with this transformation.
 
     Returns
     -------
@@ -92,12 +49,8 @@ def compute_num_live(info: NSInfo) -> Array:
     birth_logL = info.particles.loglikelihood_birth
     death_logL = info.particles.loglikelihood
 
-    birth_events = jnp.column_stack(
-        (birth_logL, jnp.ones_like(birth_logL, dtype=jnp.int32))
-    )
-    death_events = jnp.column_stack(
-        (death_logL, -jnp.ones_like(death_logL, dtype=jnp.int32))
-    )
+    birth_events = jnp.column_stack((birth_logL, jnp.ones_like(birth_logL, dtype=int)))
+    death_events = jnp.column_stack((death_logL, -jnp.ones_like(death_logL, dtype=int)))
     combined = jnp.concatenate([birth_events, death_events], axis=0)
     logL_col = combined[:, 0]
     n_col = combined[:, 1]
@@ -110,18 +63,15 @@ def compute_num_live(info: NSInfo) -> Array:
     cumsum = jnp.maximum(cumsum, 0)
     death_mask_sorted = sorted_n_col == -1
     num_live = cumsum[death_mask_sorted] + 1
-
     return num_live
 
 
 def logX(rng_key: PRNGKey, dead_info: NSInfo, shape: int = 100) -> tuple[Array, Array]:
     """Simulate the stochastic evolution of log prior volumes.
 
-    This function estimates the sequence of log prior volumes `logX_i` and the
-    log prior volume elements `log(dX_i)` associated with each dead particle.
-    For each dead particle `i`, the change in log volume is modeled as
-    `delta_logX_i = log(u_i) / m*_i`, where `u_i` is a standard uniform random
-    variable and `m*_i` is the effective number of live points when particle `i` died.
+    Wraps the effective population size in `compute_num_live`, along with stochastic
+    simulation of the log prior shrinkage associated with each deleted particle.
+
 
     Parameters
     ----------
@@ -149,19 +99,14 @@ def logX(rng_key: PRNGKey, dead_info: NSInfo, shape: int = 100) -> tuple[Array, 
     u = jax.random.uniform(
         subkey,
         shape=(dead_info.particles.loglikelihood.shape[0], shape),
-        dtype=dead_info.particles.loglikelihood.dtype,
     )
     r = jax.lax.log1p(jax.lax.neg(u))
     num_live = compute_num_live(dead_info)
     t = r / num_live[:, jnp.newaxis]
     logX = jnp.cumsum(t, axis=0)
 
-    logXp = jnp.concatenate(
-        [jnp.zeros((1, logX.shape[1]), dtype=logX.dtype), logX[:-1]], axis=0
-    )
-    logXm = jnp.concatenate(
-        [logX[1:], jnp.full((1, logX.shape[1]), -jnp.inf, dtype=logX.dtype)], axis=0
-    )
+    logXp = jnp.concatenate([jnp.zeros((1, logX.shape[1])), logX[:-1]], axis=0)
+    logXm = jnp.concatenate([logX[1:], jnp.full((1, logX.shape[1]), -jnp.inf)], axis=0)
     log_diff = logXm - logXp
     logdX = log1mexp(log_diff) + logXp - jnp.log(2)
     return logX, logdX
@@ -171,11 +116,6 @@ def log_weights(
     rng_key: PRNGKey, dead_info: NSInfo, shape: int = 100, beta: float = 1.0
 ) -> Array:
     """Calculate the log importance weights for Nested Sampling results.
-
-    The importance weight for each dead particle `i` is `w_i = dX_i * L_i^beta`,
-    where `dX_i` is the prior volume element associated with the particle and
-    `L_i` is its likelihood. This function computes `log(w_i)` using stochastically
-    simulated `log(dX_i)` values.
 
     Parameters
     ----------
@@ -206,14 +146,8 @@ def log_weights(
     return log_w[unsort_indices]
 
 
-def finalise(live: ArrayTree, dead: list[NSInfo], update_info: bool = True) -> NSInfo:
+def finalise(live: NSState, dead: list[NSInfo], update_info: bool = True) -> NSInfo:
     """Combines the history of dead particle information with the final live points.
-
-    At the end of a Nested Sampling run, the remaining live points are treated
-    as if they were the next set of "dead" points to complete the evidence
-    integral and posterior sample set. This function concatenates the `NSInfo`
-    objects accumulated for dead particles throughout the run with a new `NSInfo`
-    object created from the final live particles in `live`.
 
     Parameters
     ----------

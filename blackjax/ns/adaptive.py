@@ -33,11 +33,15 @@ class AdaptiveNSState(NamedTuple):
     """An extension of the base NSState to include inner kernel parameters.
 
     This state class extends the base Nested Sampling state by adding a
-    dictionary of parameters for the inner kernel. These parameters can be
-    updated adaptively at each step of the Nested Sampling algorithm.
+    dictionary of parameters for the inner kernel and an integator to track
+    relevant values for the evidence computation.
 
     Attributes
     ----------
+    particles
+        The StateWithLogLikelihood of the current live particles.
+    integrator
+        The NSIntegrator instance that tracks evidence-related statistics.
     inner_kernel_params
         A dictionary of parameters for the inner kernel used to generate new
         particles during the Nested Sampling process.
@@ -75,7 +79,12 @@ def build_kernel(
         [NSState, NSInfo, Dict[str, ArrayTree]], Dict[str, ArrayTree]
     ],
 ) -> Callable:
-    """Build an adaptive Nested Sampling kernel."""
+    """Build an adaptive Nested Sampling kernel.
+
+    This function constructs a Nested Sampling kernel that incorporates
+    adaptive tuning of the inner kernel parameters based on the current state
+    of the sampler and the information from the previous update step.
+    """
 
     base_kernel = base_build_kernel(
         delete_fn,

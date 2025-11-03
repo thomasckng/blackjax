@@ -11,24 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Base components for Nested Sampling algorithms in BlackJAX.
-
-This module provides the fundamental data structures (`NSState`, `NSInfo`) and
-a basic, non-adaptive kernel for Nested Sampling. Nested Sampling is a
-Monte Carlo method primarily aimed at Bayesian evidence (marginal likelihood)
-computation and posterior sampling, particularly effective for multi-modal
-distributions.
-
-The core idea is to transform the multi-dimensional evidence integral into a
-one-dimensional integral over the prior volume, ordered by likelihood. This is
-achieved by iteratively replacing the point with the lowest likelihood among a
-set of "live" points with a new point sampled from the prior, subject to the
-constraint that its likelihood must be higher than the one just discarded.
-
-This base implementation uses a provided kernel to perform the constrained
-sampling.
-"""
-
+""""""
 from typing import Callable, Dict, NamedTuple
 
 import jax
@@ -40,6 +23,11 @@ __all__ = ["init", "build_kernel", "NSState", "NSInfo", "delete_fn"]
 
 
 class StateWithLogLikelihood(NamedTuple):
+    """State of a particle in NS. Mostly dressing a conventional
+    MCMC state with loglikelihood information. Positions are an ArrayTree
+    where each leaf represents a variable from the posterior.
+    """
+
     position: ArrayLikeTree
     logdensity: Array
     loglikelihood: Array
@@ -49,21 +37,8 @@ class StateWithLogLikelihood(NamedTuple):
 class NSState(NamedTuple):
     """State of the Nested Sampler.
 
-    Contains the current live particles with their positions, log-prior density,
-    log-likelihood values, and birth likelihood contours.
-
-    Attributes
-    ----------
-    position
-        A PyTree representing the position of the particles in parameter space.
-        The leading dimension corresponds to the number of particles.
-    logdensity
-        The log-prior density values of the particles.
-    loglikelihood
-        The log-likelihood values of the particles.
-    loglikelihood_birth
-        The log-likelihood thresholds that the particles were required to exceed
-        when they were sampled (i.e., their birth likelihood contours).
+    At the most basic level, this is just a wrapper around a StateWithLogLikelihood
+    however it is extended in other NS implementations.
     """
 
     particles: StateWithLogLikelihood
@@ -75,14 +50,13 @@ class NSInfo(NamedTuple):
     Attributes
     ----------
     particles
-        The NSState of particles that were marked as "dead" (replaced).
-        Contains position, logdensity, loglikelihood, and loglikelihood_birth.
+        The StateWithLogLikelihood of particles that were marked as "dead" (replaced).
     update_info
         A NamedTuple (or any PyTree) containing information from the update step
         (inner kernel) used to generate new live particles.
     """
 
-    particles: NSState
+    particles: StateWithLogLikelihood
     update_info: NamedTuple
 
 
@@ -159,21 +133,8 @@ def build_kernel(
 ) -> Callable:
     """Build a generic Nested Sampling kernel.
 
-    This kernel implements one step of the Nested Sampling algorithm. In each step:
-    1. A set of particles with the lowest log-likelihoods are identified and
-       marked as "dead" using `delete_fn`. The log-likelihood of the "worst"
-       of these dead particles (i.e., max among the lowest ones) defines the new
-       likelihood constraint `loglikelihood_0`.
-    2. Live particles are selected (typically with replacement from the remaining
-       live particles, determined by `delete_fn`) to act as starting points for
-       the updates.
-    3. These selected live particles are evolved using an kernel
-       `inner_kernel`. The sampling is constrained to the region where
-       `loglikelihood(new_particle) > loglikelihood_0`.
-    4. The newly generated particles replace particles marked for replacement,
-       (typically the ones that have just been deleted).
-    5. The prior volume `logX` and evidence `logZ` are updated based on the
-       number of deleted particles and their likelihoods.
+    This function creates a kernel for the Nested Sampling algorithm by combining
+    a particle deletion function and an inner kernel for generating new particles.
 
     Parameters
     ----------
@@ -268,7 +229,7 @@ def delete_fn(
     loglikelihood = state.loglikelihood
     neg_dead_loglikelihood, dead_idx = jax.lax.top_k(-loglikelihood, num_delete)
     constraint_loglikelihood = loglikelihood > -neg_dead_loglikelihood.min()
-    weights = jnp.array(constraint_loglikelihood, dtype=loglikelihood.dtype)
+    weights = jnp.array(constraint_loglikelihood)
     weights = jnp.where(weights.sum() > 0.0, weights, jnp.ones_like(weights))
     start_idx = jax.random.choice(
         rng_key,

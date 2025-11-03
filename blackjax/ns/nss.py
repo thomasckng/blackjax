@@ -38,7 +38,6 @@ __all__ = [
     "as_top_level_api",
     "build_kernel",
     "init",
-    "init_inner_kernel_params",
     "update_inner_kernel_params",
 ]
 
@@ -63,25 +62,6 @@ def default_stepper_fn(x: ArrayTree, d: ArrayTree, t: float) -> tuple[ArrayTree,
         A tuple containing the new position and whether the step was accepted.
     """
     return jax.tree.map(lambda x, d: x + t * d, x, d), True
-
-
-def init_inner_kernel_params(state: NSState) -> Dict[str, ArrayTree]:
-    """Initialize inner kernel parameters from initial live particles.
-
-    Computes the empirical covariance matrix from the initial live particles
-    for use in slice direction proposals.
-
-    Parameters
-    ----------
-    state
-        The initial NSState containing live particles.
-
-    Returns
-    -------
-    Dict[str, ArrayTree]
-        Dictionary containing initial 'cov' (covariance matrix).
-    """
-    return {"cov": jnp.atleast_2d(particles_covariance_matrix(state.particles))}
 
 
 def update_inner_kernel_params(

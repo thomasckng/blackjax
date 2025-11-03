@@ -67,9 +67,8 @@ def init_integrator(particle_state: StateWithLogLikelihood) -> NSIntegrator:
         The initial integrator with logX=0, logZ=-inf, and logZ_live computed
         from the initial live points.
     """
-    dtype = particle_state.loglikelihood.dtype
-    logX = jnp.array(0.0, dtype=dtype)
-    logZ = jnp.array(-jnp.inf, dtype=dtype)
+    logX = jnp.array(0.0)
+    logZ = jnp.array(-jnp.inf)
     logZ_live = _logmeanexp(particle_state.loglikelihood) + logX
     return NSIntegrator(logX, logZ, logZ_live)
 
@@ -100,9 +99,7 @@ def update_integrator(
 
     num_particles = len(loglikelihood)
     num_deleted = len(dead_loglikelihood)
-    num_live = jnp.arange(
-        num_particles, num_particles - num_deleted, -1, dtype=loglikelihood.dtype
-    )
+    num_live = jnp.arange(num_particles, num_particles - num_deleted, -1)
     delta_logX = -1 / num_live
     logX = integrator.logX + jnp.cumsum(delta_logX)
     log_delta_X = logX + jnp.log(1 - jnp.exp(delta_logX))
@@ -116,5 +113,5 @@ def update_integrator(
 
 def _logmeanexp(x: Array) -> Array:
     """Compute log(mean(exp(x))) in a numerically stable way."""
-    n = jnp.array(x.shape[0], dtype=x.dtype)
+    n = jnp.array(x.shape[0])
     return logsumexp(x) - jnp.log(n)

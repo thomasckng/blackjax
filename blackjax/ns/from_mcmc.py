@@ -20,6 +20,7 @@ def update_with_mcmc_take_last(
 ):
     """An update strategy for NS that uses MCMC to update the particles.
     For now we will not keep the states as they will be too large to store.
+    Similar to the update_and_take_last from SMC.
     """
 
     def update_function(rng_key, state, loglikelihood_0, step_parameters):
@@ -32,11 +33,11 @@ def update_with_mcmc_take_last(
         def mcmc_kernel(rng_key, state):
             def body_fn(state, rng_key):
                 new_state, info = shared_mcmc_step_fn(rng_key, state)
-                return new_state, info  # (new_state, info)
+                return new_state, info
 
             keys = jax.random.split(rng_key, num_mcmc_steps)
             final_state, infos = jax.lax.scan(body_fn, state, keys)
-            return final_state, infos  # MCMCUpdateInfo(infos[0], infos[1])
+            return final_state, infos  # MCMCUpdateInfo(final_state, infos)
 
         return jax.vmap(mcmc_kernel)(rng_key, state)
 
@@ -56,7 +57,9 @@ def build_kernel(
         rng_key, prop_key = jax.random.split(rng_key, 2)
         mcmc_state = mcmc_init_fn(rng_key, state.position, state.logdensity)
         new_mcmc_state, mcmc_info = mcmc_step_fn(prop_key, mcmc_state, **params)
-        new_state = init_state_fn(new_mcmc_state.position, loglikelihood_birth=loglikelihood_0)
+        new_state = init_state_fn(
+            new_mcmc_state.position, loglikelihood_birth=loglikelihood_0
+        )
         new_state = jax.lax.cond(
             new_state.loglikelihood > loglikelihood_0,
             lambda _: new_state,
