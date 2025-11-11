@@ -26,6 +26,17 @@ class StateWithLogLikelihood(NamedTuple):
     """State of a particle in NS. Mostly dressing a conventional
     MCMC state with loglikelihood information. Positions are an ArrayTree
     where each leaf represents a variable from the posterior.
+
+    Attributes
+    ----------
+    position
+        The position of the particle (PyTree).
+    logdensity
+        The log-density of the particle under the prior (Array).
+    loglikelihood
+        The log-likelihood of the particle (Array).
+    loglikelihood_birth
+        The log-likelihood birth threshold for the particle (Array).
     """
 
     position: ArrayLikeTree

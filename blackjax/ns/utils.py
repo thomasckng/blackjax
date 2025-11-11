@@ -181,19 +181,14 @@ def finalise(live: NSState, dead: list[NSInfo], update_info: bool = True) -> NSI
     return NSInfo(final_particles, final_update_info)
 
 
-def ess(rng_key: PRNGKey, dead_info_map: NSInfo) -> Array:
+def ess(rng_key: PRNGKey, dead: NSInfo) -> Array:
     """Computes the Effective Sample Size (ESS) from log-weights.
-
-    The ESS is a measure of the quality of importance samples, indicating
-    how many independent samples the weighted set is equivalent to.
-    It's calculated as `(sum w_i)^2 / sum (w_i^2)`. This function computes
-    the mean ESS across multiple stochastic log-weight samples.
 
     Parameters
     ----------
     rng_key
         A JAX PRNG key, used by `log_weights`.
-    dead_info_map
+    dead
         An `NSInfo` object containing the full set of dead (and final live)
         particles, typically the output of `finalise`.
 
@@ -202,7 +197,7 @@ def ess(rng_key: PRNGKey, dead_info_map: NSInfo) -> Array:
     Array
         The mean Effective Sample Size, a scalar float.
     """
-    logw = log_weights(rng_key, dead_info_map).mean(axis=-1)
+    logw = log_weights(rng_key, dead).mean(axis=-1)
     logw -= logw.max()
     l_sum_w = jax.scipy.special.logsumexp(logw)
     l_sum_w_sq = jax.scipy.special.logsumexp(2 * logw)
@@ -210,39 +205,23 @@ def ess(rng_key: PRNGKey, dead_info_map: NSInfo) -> Array:
     return ess
 
 
-def sample(rng_key: PRNGKey, dead_info_map: NSInfo, shape: int = 1000) -> ArrayTree:
+def sample(rng_key: PRNGKey, dead: NSInfo, shape: int = 1000) -> ArrayTree:
     """Resamples particles according to their importance weights.
-
-    This function takes the full set of dead (and final live) particles and
-    their computed importance weights, and draws `shape` particles with
-    replacement, where the probability of drawing each particle is proportional
-    to its weight. This produces an unweighted sample from the target posterior
-    distribution.
-
-    Parameters
-    ----------
-    rng_key
-        A JAX PRNG key, used for both `log_weights` and `jax.random.choice`.
-    dead_info_map
-        An `NSInfo` object containing the full set of dead (and final live)
-        particles, typically the output of `finalise`.
-    shape
-        The number of posterior samples to draw. Defaults to 1000.
 
     Returns
     -------
     ArrayTree
         A PyTree of resampled particles, where each leaf has `shape`.
     """
-    logw = log_weights(rng_key, dead_info_map).mean(axis=-1)
+    logw = log_weights(rng_key, dead).mean(axis=-1)
     indices = jax.random.choice(
         rng_key,
-        dead_info_map.particles.loglikelihood.shape[0],
+        dead.particles.loglikelihood.shape[0],
         p=jnp.exp(logw.squeeze() - jnp.max(logw)),
         shape=(shape,),
         replace=True,
     )
-    return jax.tree.map(lambda leaf: leaf[indices], dead_info_map.particles)
+    return jax.tree.map(lambda leaf: leaf[indices], dead.particles)
 
 
 def get_first_row(x: ArrayTree) -> ArrayTree:
