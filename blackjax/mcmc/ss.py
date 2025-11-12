@@ -34,7 +34,6 @@ import jax.numpy as jnp
 
 from blackjax.base import SamplingAlgorithm
 from blackjax.types import Array, ArrayLikeTree, ArrayTree, PRNGKey
-from blackjax.util import linear_map
 
 __all__ = [
     "SliceState",
@@ -303,20 +302,6 @@ def sample_direction_from_covariance(
 ) -> Array:
     """Generates a random direction vector, normalized, from a multivariate Gaussian.
 
-    This function generates a direction vector uniformly distributed on a hypersphere
-    by using the mathematical simplification:
-    1. Sample from standard multivariate normal N(0, I)
-    2. Normalize to unit vector (uniform on hypersphere)
-    3. Transform by S^(1/2) where S is the covariance matrix
-    4. Scale by 2*sqrt(d+2) to optimize for slice sampling
-
-    This is equivalent to sampling from N(0, S) and normalizing by Mahalanobis norm
-    but is more numerically stable and efficient.
-
-    The scaling factor 2*sqrt(d+2) corrects for two effects:
-    - Factor sqrt(d+2): Empirical covariance of uniform d-ball has Σ = R²/(d+2) I,
-      underestimating spatial extent by (d+2)
-    - Factor 2: Initial slice interval should span diameter (2R) not radius (R)
 
     Parameters
     ----------
@@ -332,12 +317,10 @@ def sample_direction_from_covariance(
         A normalized direction vector (1D array).
     """
     p, unravel_fn = jax.flatten_util.ravel_pytree(position)
-    u = jax.random.normal(rng_key, shape=p.shape, dtype=p.dtype)
-    u /= jnp.linalg.norm(u)
-    L = jnp.linalg.cholesky(cov).astype(p.dtype)
-    # dim = cov.shape[0]
-    L = L * 2
-    d = linear_map(L, u)
+    d = jax.random.normal(rng_key, shape=p.shape, dtype=p.dtype)
+    invcov = jnp.linalg.inv(cov)
+    norm = jnp.sqrt(jnp.einsum("...i,...ij,...j", d, invcov, d))
+    d = d / norm[..., None]
     return unravel_fn(d)
 
 
