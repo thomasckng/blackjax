@@ -23,7 +23,7 @@ def update_with_mcmc_take_last(
     Similar to the update_and_take_last from SMC.
     """
 
-    def update_function(rng_key, state, loglikelihood_0, step_parameters):
+    def update_function(rng_key, state, loglikelihood_0, **step_parameters):
         shared_mcmc_step_fn = partial(
             constrained_mcmc_step_fn,
             loglikelihood_0=loglikelihood_0,

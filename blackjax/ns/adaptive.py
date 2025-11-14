@@ -16,6 +16,7 @@
 This combines the SMC equivalent of Adaptive Tempering and inner kernel tuning in one file.
 """
 
+from functools import partial
 from typing import Callable, Dict, NamedTuple, Optional
 
 import jax.numpy as jnp
@@ -86,18 +87,16 @@ def build_kernel(
     of the sampler and the information from the previous update step.
     """
 
-    base_kernel = base_build_kernel(
-        delete_fn,
-        inner_kernel,
-    )
-
     def kernel(
         rng_key: PRNGKey, state: AdaptiveNSState
     ) -> tuple[AdaptiveNSState, NSInfo]:
         """Performs one step of adaptive Nested Sampling."""
-        new_state, info = base_kernel(
-            rng_key, state, inner_kernel_params=state.inner_kernel_params
+        adapted_kernel = base_build_kernel(
+            delete_fn,
+            partial(inner_kernel, **state.inner_kernel_params),
         )
+
+        new_state, info = adapted_kernel(rng_key, state)
 
         new_inner_kernel_params = update_inner_kernel_params_fn(
             new_state, info, new_state.inner_kernel_params

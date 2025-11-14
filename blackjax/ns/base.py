@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """"""
-from typing import Callable, Dict, NamedTuple
+from typing import Callable, NamedTuple
 
 import jax
 import jax.numpy as jnp
@@ -167,9 +167,7 @@ def build_kernel(
         `(rng_key, state, inner_kernel_params) -> (new_state, ns_info)`.
     """
 
-    def kernel(
-        rng_key: PRNGKey, state: NSState, inner_kernel_params: Dict
-    ) -> tuple[NSState, NSInfo]:
+    def kernel(rng_key: PRNGKey, state: NSState) -> tuple[NSState, NSInfo]:
         # Delete, and grab all the dead information
         rng_key, delete_fn_key = jax.random.split(rng_key)
         dead_idx, target_update_idx, start_idx = delete_fn(
@@ -182,7 +180,7 @@ def build_kernel(
         inner_state = jax.tree.map(lambda x: x[start_idx], state.particles)
         loglikelihood_0 = dead_particles.loglikelihood.max()
         new_inner_state, inner_update_info = inner_kernel(
-            sample_keys, inner_state, loglikelihood_0, inner_kernel_params
+            sample_keys, inner_state, loglikelihood_0
         )
 
         # Update the particles
