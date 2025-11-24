@@ -4,8 +4,6 @@ import tqdm
 from jax.scipy.linalg import inv, solve
 
 import blackjax
-from blackjax.ns.integrator import NSIntegrator, init_integrator, update_integrator
-from blackjax.ns.nss import init_inner_kernel_params, update_inner_kernel_params
 from blackjax.ns.utils import finalise, log_weights
 
 # jax.config.update("jax_enable_x64", True)
@@ -94,20 +92,16 @@ initial_particles = jax.random.multivariate_normal(
 # and run it in a python loop
 
 live = algo.init(initial_particles)
-integrator = init_integrator(live)
-inner_kernel_params = init_inner_kernel_params(live)
 step_fn = jax.jit(algo.step)
 dead = []
 # with jax.disable_jit():
 for _ in tqdm.trange(1000):
     # We track the estimate of the evidence in the live points as logZ_live, and the accumulated sum across all steps in logZ
     # this gives a handy termination that allows us to stop early
-    if integrator.logZ_live - integrator.logZ < -3:
+    if live.integrator.logZ_live - live.integrator.logZ < -3:
         break
     rng_key, subkey = jax.random.split(rng_key, 2)
-    live, dead_info = step_fn(subkey, live, inner_kernel_params)
-    integrator = update_integrator(integrator, live, dead_info)
-    inner_kernel_params = update_inner_kernel_params(live, dead_info, inner_kernel_params)
+    live, dead_info = step_fn(subkey, live)
     dead.append(dead_info)
 
 # It is now not too bad to remap the list of NSInfos into a single instance
@@ -122,5 +116,5 @@ logw = log_weights(rng_key, nested_samples)
 logZs = jax.scipy.special.logsumexp(logw, axis=0)
 
 print(f"Analytic evidence: {log_analytic_evidence:.2f}")
-print(f"Integrated evidence: {integrator.logZ:.2f}")
+print(f"Integrated evidence: {live.integrator.logZ:.2f}")
 print(f"Estimated evidence: {logZs.mean():.2f} +- {logZs.std():.2f}")
