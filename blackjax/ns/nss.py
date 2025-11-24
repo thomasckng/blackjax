@@ -27,7 +27,7 @@ from blackjax.mcmc.ss import build_kernel as build_slice_kernel
 from blackjax.mcmc.ss import sample_direction_from_covariance
 from blackjax.ns.adaptive import build_kernel as build_adaptive_kernel
 from blackjax.ns.adaptive import init
-from blackjax.ns.base import NSInfo, NSState, StateWithLogLikelihood
+from blackjax.ns.base import NSInfo, NSState
 from blackjax.ns.base import delete_fn as default_delete_fn
 from blackjax.ns.base import init_state_strategy
 from blackjax.ns.from_mcmc import update_with_mcmc_take_last
@@ -35,9 +35,10 @@ from blackjax.smc.tuning.from_particles import particles_covariance_matrix
 from blackjax.types import ArrayTree
 
 __all__ = [
-    "init",
     "as_top_level_api",
     "build_kernel",
+    "init",
+    "update_inner_kernel_params",
 ]
 
 
@@ -63,13 +64,33 @@ def default_stepper_fn(x: ArrayTree, d: ArrayTree, t: float) -> tuple[ArrayTree,
     return jax.tree.map(lambda x, d: x + t * d, x, d), True
 
 
-def compute_covariance_from_particles(
+def update_inner_kernel_params(
     state: NSState,
     info: NSInfo,
     inner_kernel_params: Optional[Dict[str, ArrayTree]] = None,
 ) -> Dict[str, ArrayTree]:
-    """Compute empirical covariance from current particles for direction proposal."""
-    return {"cov": jnp.atleast_2d(particles_covariance_matrix(state.particles.position))}
+    """Update inner kernel parameters from current particles.
+
+    Computes the empirical covariance matrix from the live particles
+    for use in slice direction proposals.
+
+    Parameters
+    ----------
+    state
+        The current NSState containing live particles.
+    info
+        Information from the last NS step (unused but kept for interface consistency).
+    inner_kernel_params
+        Previous inner kernel parameters (unused but kept for interface consistency).
+
+    Returns
+    -------
+    Dict[str, ArrayTree]
+        Dictionary containing updated 'cov' (covariance matrix).
+    """
+    return {
+        "cov": jnp.atleast_2d(particles_covariance_matrix(state.particles.position))
+    }
 
 
 def build_kernel(
@@ -77,8 +98,9 @@ def build_kernel(
     num_inner_steps: int,
     num_delete: int = 1,
     stepper_fn: Callable = default_stepper_fn,
-    adapt_direction_params_fn: Callable = compute_covariance_from_particles,
     generate_slice_direction_fn: Callable = sample_direction_from_covariance,
+    update_inner_kernel_params_fn: Callable = update_inner_kernel_params,
+    delete_fn: Callable = default_delete_fn,
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> Callable:
@@ -91,7 +113,7 @@ def build_kernel(
         rng_key, prop_key = jax.random.split(rng_key, 2)
         d = generate_slice_direction_fn(prop_key, state.position, **params)
 
-        def slice_fn(t) -> tuple[StateWithLogLikelihood, bool]:
+        def slice_fn(t) -> tuple[NSState, bool]:
             x, step_accepted = stepper_fn(state.position, d, t)
             new_state = init_state_fn(x, loglikelihood_birth=loglikelihood_0)
             in_contour = new_state.loglikelihood > loglikelihood_0
@@ -110,13 +132,12 @@ def build_kernel(
         constrained_mcmc_slice_fn, num_inner_steps
     )
 
-    delete_fn = partial(default_delete_fn, num_delete=num_delete)
+    delete_fn = partial(delete_fn, num_delete=num_delete)
 
-    update_inner_kernel_params_fn = adapt_direction_params_fn
     kernel = build_adaptive_kernel(
         delete_fn,
         inner_kernel,
-        update_inner_kernel_params_fn,
+        update_inner_kernel_params_fn=update_inner_kernel_params_fn,
     )
     return kernel
 
@@ -127,18 +148,19 @@ def as_top_level_api(
     num_inner_steps: int,
     num_delete: int = 1,
     stepper_fn: Callable = default_stepper_fn,
-    adapt_direction_params_fn: Callable = compute_covariance_from_particles,
     generate_slice_direction_fn: Callable = sample_direction_from_covariance,
     init_state_strategy_fn: Callable = init_state_strategy,
+    update_inner_kernel_params_fn: Callable = update_inner_kernel_params,
+    delete_fn: Callable = default_delete_fn,
     max_steps: int = 10,
     max_shrinkage: int = 100,
 ) -> SamplingAlgorithm:
-    """Creates an adaptive Nested Slice Sampling (NSS) algorithm.
+    """Creates a Nested Slice Sampling (NSS) algorithm.
 
     This function configures a Nested Sampling algorithm that uses Hit-and-Run
     Slice Sampling (HRSS) as its inner kernel. The parameters for the HRSS
-    direction proposal (specifically, the covariance matrix) are adaptively tuned
-    at each step using `adapt_direction_params_fn`.
+    direction proposal (specifically, the covariance matrix) are managed
+    externally using `init_inner_kernel_params` and `update_inner_kernel_params`.
 
     Parameters
     ----------
@@ -155,14 +177,13 @@ def as_top_level_api(
     stepper_fn
         The stepper function `(x, direction, t) -> (x_new, is_accepted)` for the HRSS kernel.
         Defaults to `default_stepper_fn`.
-    adapt_direction_params_fn
-        A function `(ns_state, ns_info) -> dict_of_params` that computes/adapts
-        the parameters (e.g., covariance matrix) for the slice direction proposal,
-        based on the current NS state. Defaults to `compute_covariance_from_particles`.
     generate_slice_direction_fn
-        A function `(rng_key, **kwargs) -> direction_pytree` that generates a
-        normalized direction for HRSS. Keyword arguments are unpacked from the dict
-        returned by `adapt_direction_params_fn`. Defaults to `sample_direction_from_covariance`.
+        A function `(rng_key, position, **kwargs) -> direction_pytree` that generates a
+        normalized direction for HRSS. Keyword arguments are unpacked from the
+        inner_kernel_params dict. Defaults to `sample_direction_from_covariance`.
+    init_state_strategy_fn
+        A function to initialize NSState from positions.
+        Defaults to `init_state_strategy`.
     max_steps
         The maximum number of steps to take when expanding the interval in
         each direction during the stepping-out phase. Defaults to 10.
@@ -174,8 +195,8 @@ def as_top_level_api(
     -------
     SamplingAlgorithm
         A `SamplingAlgorithm` tuple containing `init` and `step` functions for
-        the configured Nested Slice Sampler. The state managed by this
-        algorithm is `NSState`.
+        the configured Nested Slice Sampler. The step function signature is
+        `step(rng_key, state, inner_kernel_params) -> (new_state, info)`.
     """
     init_state_fn = partial(
         init_state_strategy_fn,
@@ -188,8 +209,9 @@ def as_top_level_api(
         num_inner_steps,
         num_delete,
         stepper_fn=stepper_fn,
-        adapt_direction_params_fn=adapt_direction_params_fn,
         generate_slice_direction_fn=generate_slice_direction_fn,
+        update_inner_kernel_params_fn=update_inner_kernel_params_fn,
+        delete_fn=delete_fn,
         max_steps=max_steps,
         max_shrinkage=max_shrinkage,
     )
@@ -200,9 +222,10 @@ def as_top_level_api(
         return init(
             position,
             init_state_fn=jax.vmap(init_state_fn),
-            update_inner_kernel_params_fn=adapt_direction_params_fn,
+            update_inner_kernel_params_fn=update_inner_kernel_params_fn,
         )
 
-    step_fn = kernel
+    def step_fn(rng_key, state):
+        return kernel(rng_key, state)
 
     return SamplingAlgorithm(init_fn, step_fn)
