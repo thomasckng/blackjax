@@ -321,6 +321,7 @@ def sample_direction_from_covariance(
     invcov = jnp.linalg.inv(cov)
     norm = jnp.sqrt(jnp.einsum("...i,...ij,...j", d, invcov, d))
     d = d / norm[..., None]
+    d *= 2
     return unravel_fn(d)
 
 

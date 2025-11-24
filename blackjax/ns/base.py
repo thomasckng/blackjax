@@ -93,7 +93,7 @@ def init_state_strategy(
 
     Returns
     -------
-    NSState
+    StateWithLogLikelihood
         The initialized state containing positions, log-prior, log-likelihood, and birth likelihood.
     """
     logprior_values = logprior_fn(position)
@@ -157,7 +157,7 @@ def build_kernel(
         for new particle generation.
     inner_kernel
         This kernel function has the signature
-        `(rng_keys, inner_state, loglikelihood_0, params) -> (new_inner_state, inner_info)`,
+        `(rng_keys, inner_state, loglikelihood_0) -> (new_inner_state, inner_info)`,
         and is used to generate new particles.
 
     Returns
