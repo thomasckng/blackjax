@@ -98,7 +98,7 @@ dead = []
 for _ in tqdm.trange(1000):
     # We track the estimate of the evidence in the live points as logZ_live, and the accumulated sum across all steps in logZ
     # this gives a handy termination that allows us to stop early
-    if live.logZ_live - live.logZ < -3:  # type: ignore[attr-defined]
+    if live.integrator.logZ_live - live.integrator.logZ < -3:
         break
     rng_key, subkey = jax.random.split(rng_key, 2)
     live, dead_info = step_fn(subkey, live)
@@ -116,5 +116,5 @@ logw = log_weights(rng_key, nested_samples)
 logZs = jax.scipy.special.logsumexp(logw, axis=0)
 
 print(f"Analytic evidence: {log_analytic_evidence:.2f}")
-print(f"Runtime evidence: {live.logZ:.2f}")  # type: ignore[attr-defined]
+print(f"Integrated evidence: {live.integrator.logZ:.2f}")
 print(f"Estimated evidence: {logZs.mean():.2f} +- {logZs.std():.2f}")
