@@ -123,7 +123,7 @@ class NestedSamplingTest(chex.TestCase):
         state = base.init(positions, init_state_fn)
 
         # Mock inner kernel for testing - matches new API signature
-        def mock_inner_kernel(rng_keys, inner_state, loglikelihood_0, params):
+        def mock_inner_kernel(rng_keys, inner_state, loglikelihood_0):
             # inner_state is StateWithLogLikelihood
             # Simple random walk for testing
             def single_step(rng_key, state):
