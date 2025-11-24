@@ -34,7 +34,7 @@ class AdaptiveNSState(NamedTuple):
     """An extension of the base NSState to include inner kernel parameters.
 
     This state class extends the base Nested Sampling state by adding a
-    dictionary of parameters for the inner kernel and an integator to track
+    dictionary of parameters for the inner kernel and an integrator to track
     relevant values for the evidence computation.
 
     Attributes
