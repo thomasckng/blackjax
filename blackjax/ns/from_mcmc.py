@@ -50,7 +50,7 @@ def update_with_mcmc_take_last(
             keys = jax.random.split(rng_key, num_mcmc_steps)
 
             def body_fn(state, rng_key):
-                new_state, info, _ = shared_mcmc_step_fn(rng_key, state)
+                new_state, info = shared_mcmc_step_fn(rng_key, state)
                 return new_state, info
 
             final_state, infos = jax.lax.scan(body_fn, state, keys)
