@@ -65,6 +65,7 @@ def default_stepper_fn(x: ArrayTree, d: ArrayTree, t: float) -> tuple[ArrayTree,
 
 
 def update_inner_kernel_params(
+    rng_key: jax.random.PRNGKey,
     state: NSState,
     info: NSInfo,
     inner_kernel_params: Optional[Dict[str, ArrayTree]] = None,

@@ -19,6 +19,7 @@ This combines the SMC equivalent of Adaptive Tempering and inner kernel tuning i
 from functools import partial
 from typing import Callable, Dict, NamedTuple, Optional
 
+import jax
 import jax.numpy as jnp
 
 from blackjax.ns.base import NSInfo, NSState, StateWithLogLikelihood
@@ -58,6 +59,7 @@ def init(
     init_state_fn: Callable,
     loglikelihood_birth: Array = jnp.nan,
     update_inner_kernel_params_fn: Optional[Callable] = None,
+    rng_key: Optional[jax.random.PRNGKey] = None,
 ) -> AdaptiveNSState:
     base_state = base_init(
         positions, init_state_fn, loglikelihood_birth=loglikelihood_birth
@@ -65,7 +67,9 @@ def init(
     integrator = init_integrator(base_state.particles)
     inner_kernel_params = {}
     if update_inner_kernel_params_fn is not None:
-        inner_kernel_params = update_inner_kernel_params_fn(base_state, None, {})
+        inner_kernel_params = update_inner_kernel_params_fn(
+            rng_key, base_state, None, {}
+        )
     return AdaptiveNSState(
         particles=base_state.particles,
         inner_kernel_params=inner_kernel_params,
@@ -77,7 +81,7 @@ def build_kernel(
     delete_fn: Callable,
     inner_kernel: Callable,
     update_inner_kernel_params_fn: Callable[
-        [NSState, NSInfo, Dict[str, ArrayTree]], Dict[str, ArrayTree]
+        [PRNGKey, NSState, NSInfo, Dict[str, ArrayTree]], Dict[str, ArrayTree]
     ],
 ) -> Callable:
     """Build an adaptive Nested Sampling kernel.
@@ -97,9 +101,9 @@ def build_kernel(
         )
 
         new_state, info = adapted_kernel(rng_key, state)
-
+        inner_kernel_update_key, rng_key = jax.random.split(rng_key)
         new_inner_kernel_params = update_inner_kernel_params_fn(
-            new_state, info, new_state.inner_kernel_params
+            inner_kernel_update_key, new_state, info, new_state.inner_kernel_params
         )
         new_integrator_state = update_integrator(
             state.integrator, new_state.particles, info.particles
