@@ -317,7 +317,7 @@ def sample_direction_from_covariance(
         A normalized direction vector (1D array).
     """
     p, unravel_fn = jax.flatten_util.ravel_pytree(position)
-    d = jax.random.normal(rng_key, shape=p.shape, dtype=p.dtype)
+    d = jax.random.multivariate_normal(rng_key, mean=jnp.zeros(cov.shape[0]), cov=cov)
     invcov = jnp.linalg.inv(cov)
     norm = jnp.sqrt(jnp.einsum("...i,...ij,...j", d, invcov, d))
     d = d / norm[..., None]
