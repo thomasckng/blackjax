@@ -336,8 +336,8 @@ class NestedSamplingStatisticalTest(chex.TestCase):
         self.assertLess(
             bias,
             tolerance,
-            f"Evidence estimate {mean_estimate:.3f} vs analytic {analytical_log_evidence:.3f} "
-            f"differs by {bias:.3f}, which exceeds 2σ = {tolerance:.3f}",
+            f"Evidence estimate {mean_estimate} vs analytic {analytical_log_evidence} "
+            f"differs by {bias}, which exceeds 2σ = {tolerance}",
         )
 
         # Also test that individual estimates are reasonable
@@ -573,12 +573,12 @@ class NestedSamplingStatisticalTest(chex.TestCase):
         self.assertGreater(
             analytical_log_evidence,
             lower_bound,
-            f"Analytic evidence {analytical_log_evidence:.3f} below 99% CI lower bound {lower_bound:.3f}",
+            f"Analytic evidence {analytical_log_evidence} below 99% CI lower bound {lower_bound}",
         )
         self.assertLess(
             analytical_log_evidence,
             upper_bound,
-            f"Analytic evidence {analytical_log_evidence:.3f} above 99% CI upper bound {upper_bound:.3f}",
+            f"Analytic evidence {analytical_log_evidence} above 99% CI upper bound {upper_bound}",
         )
 
     def test_evidence_integration_simple_case(self):
@@ -627,12 +627,12 @@ class NestedSamplingStatisticalTest(chex.TestCase):
         self.assertGreater(
             analytical_log_evidence,
             lower_bound,
-            f"Analytic evidence {analytical_log_evidence:.3f} below 95% CI",
+            f"Analytic evidence {analytical_log_evidence} below 95% CI",
         )
         self.assertLess(
             analytical_log_evidence,
             upper_bound,
-            f"Analytic evidence {analytical_log_evidence:.3f} above 95% CI",
+            f"Analytic evidence {analytical_log_evidence} above 95% CI",
         )
 
     def test_effective_sample_size_calculation(self):
