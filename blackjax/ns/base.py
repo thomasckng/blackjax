@@ -75,7 +75,7 @@ def init_state_strategy(
     position: ArrayLikeTree,
     logprior_fn: Callable,
     loglikelihood_fn: Callable,
-    loglikelihood_birth: Array = jnp.nan,
+    loglikelihood_birth: float = jnp.nan,
 ) -> StateWithLogLikelihood:
     """The default initialisation strategy for each state.
 
@@ -110,7 +110,7 @@ def init_state_strategy(
 def init(
     positions: ArrayLikeTree,
     init_state_fn: Callable,
-    loglikelihood_birth: Array = jnp.nan,
+    loglikelihood_birth: float = jnp.nan,
 ) -> NSState:
     """Initializes the Nested Sampler state.
 

@@ -213,31 +213,33 @@ def horizontal_slice(
         i, _, _, is_accepted = carry
         return is_accepted & (i > 0)
 
-    j, _, l, _ = jax.lax.while_loop(
+    j, _, left, _ = jax.lax.while_loop(
         step_cond_fun, step_body_fun, (j + 1, -1, 1 - u, True)
     )
-    k, _, r, _ = jax.lax.while_loop(step_cond_fun, step_body_fun, (k + 1, +1, -u, True))
+    k, _, right, _ = jax.lax.while_loop(
+        step_cond_fun, step_body_fun, (k + 1, +1, -u, True)
+    )
 
     # Shrink
     def shrink_body_fun(carry):
-        n, rng_key, l, r, state, is_accepted = carry
+        n, rng_key, left, right, state, is_accepted = carry
 
         rng_key, subkey = jax.random.split(rng_key)
-        u = jax.random.uniform(subkey, minval=l, maxval=r)
+        u = jax.random.uniform(subkey, minval=left, maxval=right)
 
         new_state, is_accepted = slice_fn(u)
         n += 1
 
-        l = jnp.where(u < 0, u, l)
-        r = jnp.where(u > 0, u, r)
+        left = jnp.where(u < 0, u, left)
+        right = jnp.where(u > 0, u, right)
 
-        return n, rng_key, l, r, new_state, is_accepted
+        return n, rng_key, left, right, new_state, is_accepted
 
     def shrink_cond_fun(carry):
         n, _, _, _, _, is_accepted = carry
         return ~is_accepted & (n < max_shrinkage)
 
-    carry = 0, rng_key, l, r, state, False
+    carry = 0, rng_key, left, right, state, False
     carry = jax.lax.while_loop(shrink_cond_fun, shrink_body_fun, carry)
     n, _, _, _, new_state, is_accepted = carry
     new_state = jax.tree.map(

@@ -26,7 +26,7 @@ from blackjax.ns.base import NSInfo, NSState, StateWithLogLikelihood
 from blackjax.ns.base import build_kernel as base_build_kernel
 from blackjax.ns.base import init as base_init
 from blackjax.ns.integrator import NSIntegrator, init_integrator, update_integrator
-from blackjax.types import Array, ArrayLikeTree, ArrayTree, PRNGKey
+from blackjax.types import ArrayLikeTree, ArrayTree, PRNGKey
 
 __all__ = ["init", "build_kernel"]
 
@@ -57,7 +57,7 @@ class AdaptiveNSState(NamedTuple):
 def init(
     positions: ArrayLikeTree,
     init_state_fn: Callable,
-    loglikelihood_birth: Array = jnp.nan,
+    loglikelihood_birth: float = jnp.nan,
     update_inner_kernel_params_fn: Optional[Callable] = None,
     rng_key: Optional[jax.random.PRNGKey] = None,
 ) -> AdaptiveNSState:

@@ -201,7 +201,7 @@ class AdaptiveNestedSamplingTest(chex.TestCase):
 
         positions = jax.random.normal(key, (num_live,))
 
-        def mock_update_params_fn(state, info, current_params):
+        def mock_update_params_fn(rng_key, state, info, current_params):
             return {"test_param": 1.0}
 
         init_state_fn = jax.vmap(
@@ -239,7 +239,7 @@ class NestedSliceSamplingTest(chex.TestCase):
         state = base.init(positions, init_state_fn)
 
         # Use update_inner_kernel_params instead of removed init_inner_kernel_params
-        params = nss.update_inner_kernel_params(state, None, {})
+        params = nss.update_inner_kernel_params(key, state, None, {})
 
         # Check that covariance is computed
         self.assertIn("cov", params)
