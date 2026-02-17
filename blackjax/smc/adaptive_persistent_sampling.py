@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Callable
+from typing import Callable, Optional
 
 import jax.numpy as jnp
 
@@ -33,6 +33,7 @@ def build_kernel(
     target_ess: float | Array,
     update_strategy: Callable = update_and_take_last,
     root_solver: Callable = solver.dichotomy,
+    max_delta_per_step: Optional[float] = None,
 ) -> Callable:
     """Build an adaptive Persistent Sampling kernel, with signature
     (rng_key,
@@ -77,6 +78,11 @@ def build_kernel(
     root_solver
         The solver used to adaptively compute the temperature given a target number
         of effective samples. By default, blackjax.smc.solver.dichotomy.
+    max_delta_per_step: float | None
+        Maximum allowed temperature increment per step. If None, no cap is applied
+        and the solver can jump to lambda=1 in a single step. Setting this to e.g. 0.1
+        prevents large temperature jumps that can occur for flat likelihoods where
+        the ESS remains high even at large temperature increments.
 
     Returns
     -------
@@ -92,6 +98,8 @@ def build_kernel(
         n_particles = state.persistent_weights.shape[1]
         target_val = jnp.log(n_particles * target_ess)
         max_delta = 1 - state.tempering_schedule[state.iteration]  # so that lambda <= 1
+        if max_delta_per_step is not None:
+            max_delta = jnp.minimum(max_delta, max_delta_per_step)
 
         def fun_to_solve(delta: Array) -> Array:
             """Function for which we want to find a root, i.e. the difference
@@ -162,6 +170,7 @@ def as_top_level_api(
     num_mcmc_steps: int = 10,
     update_strategy: Callable = update_and_take_last,
     root_solver: Callable = solver.dichotomy,
+    max_delta_per_step: Optional[float] = None,
 ) -> SamplingAlgorithm:
     """
     Implements the user interface for the adaptive Persistent Sampling
@@ -214,6 +223,11 @@ def as_top_level_api(
     root_solver : Callable, optional
         The solver used to adaptively compute the temperature given a target
         number of effective samples. By default, blackjax.smc.solver.dichotomy.
+    max_delta_per_step : float | None, optional
+        Maximum allowed temperature increment per step. If None (default), no
+        cap is applied and the solver can jump to lambda=1 in a single step.
+        Setting this to e.g. 0.1 prevents large temperature jumps that can occur
+        for flat likelihoods.
 
     Returns
     -------
@@ -236,6 +250,7 @@ def as_top_level_api(
         target_ess,
         update_strategy,
         root_solver,
+        max_delta_per_step,
     )
 
     def init_fn(position: ArrayLikeTree) -> persistent_sampling.PersistentSMCState:

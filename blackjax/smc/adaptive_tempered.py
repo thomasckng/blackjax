@@ -34,6 +34,7 @@ def build_kernel(
     resampling_fn: Callable,
     target_ess: float,
     root_solver: Callable = solver.dichotomy,
+    max_delta_per_step: Optional[float] = None,
     **extra_parameters: dict[str, Any],
 ) -> Callable:
     """Build a Tempered SMC step using an adaptive schedule.
@@ -57,6 +58,11 @@ def build_kernel(
     root_solver: Callable, optional
         The solver used to adaptively compute the temperature given a target number
         of effective samples. By default, blackjax.smc.solver.dichotomy.
+    max_delta_per_step: float | None, optional
+        Maximum allowed temperature increment per step. If None (default), no
+        cap is applied and the solver can jump to lambda=1 in a single step.
+        Setting this to e.g. 0.1 prevents large temperature jumps that can occur
+        for flat likelihoods where the ESS remains high even at large temperature increments.
     **extra_parameters : dict[str, Any]
         Additional parameters to pass to tempered.build_kernel.
 
@@ -72,6 +78,8 @@ def build_kernel(
     def compute_delta(state: tempered.TemperedSMCState) -> float | Array:
         tempering_param = state.tempering_param
         max_delta = 1 - tempering_param
+        if max_delta_per_step is not None:
+            max_delta = jnp.minimum(max_delta, max_delta_per_step)
         delta = ess.ess_solver(
             jax.vmap(loglikelihood_fn),
             state.particles,
@@ -119,6 +127,7 @@ def as_top_level_api(
     resampling_fn: Callable,
     target_ess: float,
     root_solver: Callable = solver.dichotomy,
+    max_delta_per_step: Optional[float] = None,
     num_mcmc_steps: int = 10,
     **extra_parameters: dict[str, Any],
 ) -> SamplingAlgorithm:
@@ -145,6 +154,11 @@ def as_top_level_api(
     root_solver: Callable, optional
         The solver used to adaptively compute the temperature given a target number
         of effective samples. By default, blackjax.smc.solver.dichotomy.
+    max_delta_per_step: float | None, optional
+        Maximum allowed temperature increment per step. If None (default), no
+        cap is applied and the solver can jump to lambda=1 in a single step.
+        Setting this to e.g. 0.1 prevents large temperature jumps that can occur
+        for flat likelihoods.
     num_mcmc_steps: int, optional
         The number of times the MCMC kernel is applied to the particles per step,
         by default 10.
@@ -165,6 +179,7 @@ def as_top_level_api(
         resampling_fn,
         target_ess,
         root_solver,
+        max_delta_per_step,
         **extra_parameters,
     )
 
