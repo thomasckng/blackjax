@@ -16,16 +16,25 @@ class MCMCUpdateInfo(NamedTuple):
 
 
 class ConstrainedMCMCInfo(NamedTuple):
-    """Info for a constrained MCMC proposal."""
+    """Info for a constrained MCMC proposal.
+
+    Attributes
+    ----------
+    info
+        The underlying MCMC info (e.g., RWInfo for random walk).
+    is_accepted
+        True if both the MCMC proposal was accepted AND the proposed
+        point is above the likelihood threshold.
+    """
 
     info: NamedTuple
     is_accepted: jnp.ndarray
-    num_trials: jnp.ndarray
 
 
 def update_with_mcmc_take_last(
     constrained_mcmc_step_fn,
     num_mcmc_steps,
+    num_delete,
 ):
     """An update strategy for NS that uses MCMC to update the particles.
     For now we will not keep the states as they will be too large to store.
@@ -37,9 +46,26 @@ def update_with_mcmc_take_last(
         Wrapped MCMC step function that enforces the NS likelihood constraint.
     num_mcmc_steps
         Number of MCMC proposals per particle.
+    num_delete
+        Number of particles to replace per step.
     """
 
     def update_function(rng_key, state, loglikelihood_0, **step_parameters):
+        choice_key, sample_key = jax.random.split(rng_key)
+        particles = state.particles
+
+        # Select start particles from survivors
+        weights = (particles.loglikelihood > loglikelihood_0).astype(jnp.float32)
+        weights = jnp.where(weights.sum() > 0.0, weights, jnp.ones_like(weights))
+        start_idx = jax.random.choice(
+            choice_key,
+            len(weights),
+            shape=(num_delete,),
+            p=weights / weights.sum(),
+            replace=True,
+        )
+        start_state = jax.tree.map(lambda x: x[start_idx], particles)
+
         shared_mcmc_step_fn = partial(
             constrained_mcmc_step_fn,
             loglikelihood_0=loglikelihood_0,
@@ -54,9 +80,10 @@ def update_with_mcmc_take_last(
                 return new_state, info
 
             final_state, infos = jax.lax.scan(body_fn, state, keys)
-            return final_state, infos  # MCMCUpdateInfo(final_state, infos)
+            return final_state, infos
 
-        return jax.vmap(mcmc_kernel)(rng_key, state)
+        sample_keys = jax.random.split(sample_key, num_delete)
+        return jax.vmap(mcmc_kernel)(sample_keys, start_state)
 
     return update_function
 
@@ -71,62 +98,57 @@ def build_kernel(
     num_delete: int = 1,
     delete_fn: Callable = default_delete_fn,
 ) -> Callable:
-    """Builds a Nested Sampling kernel wrapping any MCMC algorithm."""
+    """Builds a Nested Sampling kernel wrapping any MCMC algorithm.
+
+    Parameters
+    ----------
+    init_state_fn
+        Function to initialize a NS particle state from a position.
+    logdensity_fn
+        Log-density function (typically the prior log-probability).
+    mcmc_init_fn
+        Function to initialize MCMC state from position and logdensity_fn.
+    mcmc_step_fn
+        MCMC step function with signature (rng_key, state, logdensity_fn, **params).
+    num_inner_steps
+        Number of MCMC steps per particle replacement.
+    update_inner_kernel_params_fn
+        Function to update MCMC kernel parameters adaptively.
+    num_delete
+        Number of particles to replace per NS iteration.
+    delete_fn
+        Function to select which particles to delete.
+    """
 
     def constrained_mcmc_step_fn(rng_key, state, loglikelihood_0, **params):
-        def propose_once(rng_key, current_state):
-            rng_key, step_key = jax.random.split(rng_key)
-            mcmc_state = mcmc_init_fn(current_state.position, logdensity_fn)
-            new_mcmc_state, mcmc_info = mcmc_step_fn(
-                step_key, mcmc_state, logdensity_fn, **params
-            )
-            proposed_state = init_state_fn(
-                new_mcmc_state.position, loglikelihood_birth=loglikelihood_0
-            )
-            within_contour = proposed_state.loglikelihood > loglikelihood_0
-            proposal_accepted = getattr(mcmc_info, "is_accepted", True)
-            is_accepted = proposal_accepted & within_contour
-            new_state = jax.lax.cond(
-                is_accepted,
-                lambda _: proposed_state,
-                lambda _: current_state,
-                operand=None,
-            )
-            return (
-                rng_key,
-                new_state,
-                mcmc_info,
-                is_accepted,
-                jnp.array(1, dtype=jnp.int32),
-            )
+        """Single constrained MCMC step that respects the likelihood threshold.
 
-        rng_key, state, mcmc_info, is_accepted, trials = propose_once(rng_key, state)
-
-        def cond_fn(carry):
-            _, _, _, accepted, _ = carry
-            return ~accepted
-
-        def body_fn(carry):
-            rng_key, current_state, _, _, trials = carry
-            rng_key, new_state, new_info, is_accepted, new_trials = propose_once(
-                rng_key, current_state
-            )
-            return (
-                rng_key,
-                new_state,
-                new_info,
-                is_accepted,
-                trials + new_trials,
-            )
-
-        rng_key, state, mcmc_info, is_accepted, trials = jax.lax.while_loop(
-            cond_fn, body_fn, (rng_key, state, mcmc_info, is_accepted, trials)
+        Proposes a move, accepts if both the MCMC acceptance criterion is
+        satisfied AND the proposed point is above the likelihood threshold.
+        If rejected, stays at current position.
+        """
+        mcmc_state = mcmc_init_fn(state.position, logdensity_fn)
+        new_mcmc_state, mcmc_info = mcmc_step_fn(
+            rng_key, mcmc_state, logdensity_fn, **params
         )
+        proposed_state = init_state_fn(
+            new_mcmc_state.position, loglikelihood_birth=loglikelihood_0
+        )
+        within_contour = proposed_state.loglikelihood > loglikelihood_0
+        proposal_accepted = getattr(mcmc_info, "is_accepted", True)
+        is_accepted = proposal_accepted & within_contour
+        new_state = jax.lax.cond(
+            is_accepted,
+            lambda _: proposed_state,
+            lambda _: state,
+            operand=None,
+        )
+        info = ConstrainedMCMCInfo(mcmc_info, is_accepted)
+        return new_state, info
 
-        mcmc_info = ConstrainedMCMCInfo(mcmc_info, is_accepted, trials)
-        return state, mcmc_info, trials
-
-    inner_kernel = update_with_mcmc_take_last(constrained_mcmc_step_fn, num_inner_steps)
+    inner_kernel = update_with_mcmc_take_last(
+        constrained_mcmc_step_fn, num_inner_steps, num_delete
+    )
 
     delete_fn = partial(delete_fn, num_delete=num_delete)
 
