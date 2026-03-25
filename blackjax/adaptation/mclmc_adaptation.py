@@ -330,7 +330,7 @@ def handle_nans(
     p, unravel_fn = ravel_pytree(next_state.position)
     q, unravel_fn = ravel_pytree(next_state.momentum)
     nonans = jnp.logical_and(jnp.all(jnp.isfinite(p)), jnp.all(jnp.isfinite(q)))
-    state, step_size, kinetic_change = jax.tree_util.tree_map(
+    state, step_size, kinetic_change = jax.tree.map(
         lambda new, old: jax.lax.select(nonans, jnp.nan_to_num(new), old),
         (next_state, step_size_max, kinetic_change),
         (previous_state, step_size * reduced_step_size, 0.0),
@@ -345,3 +345,33 @@ def handle_nans(
     )
 
     return nonans, state, step_size, kinetic_change
+
+
+# def handle_high_energy(
+#     previous_state, next_state, energy_change, key, inverse_mass_matrix, cutoff, euclidean=False
+# ):
+
+
+#     metric = metrics.default_metric(inverse_mass_matrix)
+
+#     new_momentum = jax.lax.cond(
+#         euclidean,
+#         lambda: metric.sample_momentum(key, previous_state.position),
+#         lambda: generate_unit_vector(key, previous_state.position),
+#     )
+
+
+#     # new_momentum = euclidean*metric.sample_momentum(key, previous_state.position) + (1-euclidean)*generate_unit_vector(key, previous_state.position)
+#     # new_momentum = generate_unit_vector(key, previous_state.position)
+
+#     state = jax.lax.cond(
+#         jnp.abs(energy_change) > cutoff,
+#         lambda: previous_state._replace(
+#             # momentum=generate_unit_vector(key, next_state.position)
+#             momentum=new_momentum
+#         ),
+#         lambda: next_state,
+#     )
+#     energy_change = jnp.clip(energy_change, -cutoff, cutoff)
+
+#     return energy_change, state
