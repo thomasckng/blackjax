@@ -55,7 +55,7 @@
     <link rel="prev" title="blackjax.adaptation.mclmc_adaptation" href="../mclmc_adaptation/index.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="0.1.dev1+gca4514fc9" />
+  <meta name="docsearch:version" content="0.1.dev1+g023ff19bf" />
   </head>
   
   
@@ -180,6 +180,7 @@
 <li class="toctree-l3"><a class="reference internal" href="../chees_adaptation/index.html">blackjax.adaptation.chees_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../laps/index.html">blackjax.adaptation.laps</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../laps_burn_in/index.html">blackjax.adaptation.laps_burn_in</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../low_rank_adaptation/index.html">blackjax.adaptation.low_rank_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../mass_matrix/index.html">blackjax.adaptation.mass_matrix</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../mclmc_adaptation/index.html">blackjax.adaptation.mclmc_adaptation</a></li>
 <li class="toctree-l3 current active"><a class="current reference internal" href="#">blackjax.adaptation.meads_adaptation</a></li>
@@ -243,7 +244,9 @@
 </ul>
 </details></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../../vi/index.html">blackjax.vi</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../vi/fullrank_vi/index.html">blackjax.vi.fullrank_vi</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../vi/meanfield_vi/index.html">blackjax.vi.meanfield_vi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../vi/multipathfinder/index.html">blackjax.vi.multipathfinder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../vi/pathfinder/index.html">blackjax.vi.pathfinder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../vi/schrodinger_follmer/index.html">blackjax.vi.schrodinger_follmer</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../vi/svgd/index.html">blackjax.vi.svgd</a></li>
@@ -408,7 +411,7 @@
 <h2>Functions<a class="headerlink" href="#functions" title="Link to this heading">#</a></h2>
 <div class="pst-scrollable-table-container"><table class="autosummary longtable table">
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#blackjax.adaptation.meads_adaptation.base" title="blackjax.adaptation.meads_adaptation.base"><code class="xref py py-obj docutils literal notranslate"><span class="pre">base</span></code></a>()</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#blackjax.adaptation.meads_adaptation.base" title="blackjax.adaptation.meads_adaptation.base"><code class="xref py py-obj docutils literal notranslate"><span class="pre">base</span></code></a>([num_folds, step_size_multiplier, damping_slowdown])</p></td>
 <td><p>Maximum-Eigenvalue Adaptation of damping and step size for the generalized</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#blackjax.adaptation.meads_adaptation.meads_adaptation" title="blackjax.adaptation.meads_adaptation.meads_adaptation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">meads_adaptation</span></code></a>(→ blackjax.base.AdaptationAlgorithm)</p></td>
@@ -428,15 +431,16 @@
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">MEADSAdaptationState</span></span><a class="reference internal" href="../../../../_modules/blackjax/adaptation/meads_adaptation.html#MEADSAdaptationState"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.adaptation.meads_adaptation.MEADSAdaptationState" title="Link to this definition">#</a></dt>
 <dd><p>State of the MEADS adaptation scheme.</p>
 <dl class="simple">
-<dt>step_size</dt><dd><p>Value of the step_size parameter of the generalized HMC algorithm.</p>
+<dt>current_iteration</dt><dd><p>Current iteration of the adaptation.</p>
 </dd>
-<dt>position_sigma</dt><dd><p>PyTree containing the per dimension sample standard deviation of the
-position variable. Used to scale the momentum variable on the generalized
-HMC algorithm.</p>
+<dt>step_size</dt><dd><p>Step size for each fold, shape (num_folds,).</p>
 </dd>
-<dt>alpha</dt><dd><p>Value of the alpha parameter of the generalized HMC algorithm.</p>
+<dt>position_sigma</dt><dd><p>PyTree with per-fold per-dimension sample standard deviation of the
+position variable, leading axis has size num_folds.</p>
 </dd>
-<dt>delta</dt><dd><p>Value of the delta parameter of the generalized HMC algorithm.</p>
+<dt>alpha</dt><dd><p>Alpha parameter (momentum persistence) for each fold, shape (num_folds,).</p>
+</dd>
+<dt>delta</dt><dd><p>Delta parameter (slice translation) for each fold, shape (num_folds,).</p>
 </dd>
 </dl>
 <dl class="py attribute">
@@ -446,7 +450,7 @@ HMC algorithm.</p>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="blackjax.adaptation.meads_adaptation.MEADSAdaptationState.step_size">
-<span class="sig-name descname"><span class="pre">step_size</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><a class="reference internal" href="../../../../_modules/blackjax/adaptation/meads_adaptation.html#MEADSAdaptationState.step_size"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.adaptation.meads_adaptation.MEADSAdaptationState.step_size" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">step_size</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">blackjax.types.Array</span></span><a class="reference internal" href="../../../../_modules/blackjax/adaptation/meads_adaptation.html#MEADSAdaptationState.step_size"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.adaptation.meads_adaptation.MEADSAdaptationState.step_size" title="Link to this definition">#</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
@@ -456,34 +460,40 @@ HMC algorithm.</p>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="blackjax.adaptation.meads_adaptation.MEADSAdaptationState.alpha">
-<span class="sig-name descname"><span class="pre">alpha</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><a class="reference internal" href="../../../../_modules/blackjax/adaptation/meads_adaptation.html#MEADSAdaptationState.alpha"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.adaptation.meads_adaptation.MEADSAdaptationState.alpha" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">alpha</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">blackjax.types.Array</span></span><a class="reference internal" href="../../../../_modules/blackjax/adaptation/meads_adaptation.html#MEADSAdaptationState.alpha"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.adaptation.meads_adaptation.MEADSAdaptationState.alpha" title="Link to this definition">#</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="blackjax.adaptation.meads_adaptation.MEADSAdaptationState.delta">
-<span class="sig-name descname"><span class="pre">delta</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><a class="reference internal" href="../../../../_modules/blackjax/adaptation/meads_adaptation.html#MEADSAdaptationState.delta"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.adaptation.meads_adaptation.MEADSAdaptationState.delta" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">delta</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">blackjax.types.Array</span></span><a class="reference internal" href="../../../../_modules/blackjax/adaptation/meads_adaptation.html#MEADSAdaptationState.delta"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.adaptation.meads_adaptation.MEADSAdaptationState.delta" title="Link to this definition">#</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="blackjax.adaptation.meads_adaptation.base">
-<span class="sig-name descname"><span class="pre">base</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../../../_modules/blackjax/adaptation/meads_adaptation.html#base"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.adaptation.meads_adaptation.base" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">base</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_folds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">4</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">step_size_multiplier</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">damping_slowdown</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../../../_modules/blackjax/adaptation/meads_adaptation.html#base"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.adaptation.meads_adaptation.base" title="Link to this definition">#</a></dt>
 <dd><p>Maximum-Eigenvalue Adaptation of damping and step size for the generalized
 Hamiltonian Monte Carlo kernel <span id="id1">[<a class="reference internal" href="../../../../bib.html#id14" title="Matthew D Hoffman and Pavel Sountsov. Tuning-free generalized hamiltonian monte carlo. In International Conference on Artificial Intelligence and Statistics, 7799–7813. PMLR, 2022.">HS22</a>]</span>.</p>
-<p>This algorithm performs a cross-chain adaptation scheme for the generalized
-HMC algorithm that automatically selects values for the generalized HMC’s
-tunable parameters based on statistics collected from a population of many
-chains. It uses heuristics determined by the maximum eigenvalue of the
-covariance and gradient matrices given by the grouped samples of all chains
-with shape.</p>
-<p>This is an implementation of Algorithm 3 of <span id="id2">[<a class="reference internal" href="../../../../bib.html#id14" title="Matthew D Hoffman and Pavel Sountsov. Tuning-free generalized hamiltonian monte carlo. In International Conference on Artificial Intelligence and Statistics, 7799–7813. PMLR, 2022.">HS22</a>]</span> using cross-chain
-adaptation instead of parallel ensemble chain adaptation.</p>
+<p>Full implementation of Algorithm 3 with K-fold cross-chain adaptation and
+chain shuffling. Chains are divided into <code class="docutils literal notranslate"><span class="pre">num_folds</span></code> folds; at each step
+statistics from fold <code class="docutils literal notranslate"><span class="pre">t</span> <span class="pre">mod</span> <span class="pre">K</span></code> are used to update the parameters for fold
+<code class="docutils literal notranslate"><span class="pre">(t+1)</span> <span class="pre">mod</span> <span class="pre">K</span></code>. Every K steps all chains are reshuffled across folds.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p><ul class="simple">
-<li><p><em>init</em> – Function that initializes the warmup.</p></li>
-<li><p><em>update</em> – Function that moves the warmup one step.</p></li>
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num_folds</strong> – Number of folds K to split chains into. Must divide num_chains evenly.</p></li>
+<li><p><strong>step_size_multiplier</strong> – Multiplicative factor applied to the raw step size heuristic (default 0.5
+as in the paper).</p></li>
+<li><p><strong>damping_slowdown</strong> – Controls the damping floor in early iterations. The floor on γ is
+<code class="docutils literal notranslate"><span class="pre">damping_slowdown</span> <span class="pre">/</span> <span class="pre">(t·ε)</span></code>, so higher values force stronger damping
+(higher α) in early iterations. Default is 1.0 as in the paper.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><em>init</em> – Function that initializes the warmup state.</p></li>
+<li><p><em>update</em> – Function that moves the warmup one step forward.</p></li>
 </ul>
 </p>
 </dd>
@@ -492,32 +502,28 @@ adaptation instead of parallel ensemble chain adaptation.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="blackjax.adaptation.meads_adaptation.meads_adaptation">
-<span class="sig-name descname"><span class="pre">meads_adaptation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">logdensity_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_chains</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">adaptation_info_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">return_all_adapt_info</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">blackjax.base.AdaptationAlgorithm</span></span></span><a class="reference internal" href="../../../../_modules/blackjax/adaptation/meads_adaptation.html#meads_adaptation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.adaptation.meads_adaptation.meads_adaptation" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">meads_adaptation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">logdensity_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_chains</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_folds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">4</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">step_size_multiplier</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">damping_slowdown</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adaptation_info_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">return_all_adapt_info</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">blackjax.base.AdaptationAlgorithm</span></span></span><a class="reference internal" href="../../../../_modules/blackjax/adaptation/meads_adaptation.html#meads_adaptation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.adaptation.meads_adaptation.meads_adaptation" title="Link to this definition">#</a></dt>
 <dd><p>Adapt the parameters of the Generalized HMC algorithm.</p>
-<p>The Generalized HMC algorithm depends on three parameters, each controlling
-one element of its behaviour: step size controls the integrator’s dynamics,
-alpha controls the persistency of the momentum variable, and delta controls
-the deterministic transformation of the slice variable used to perform the
-non-reversible Metropolis-Hastings accept/reject step.</p>
-<p>The step size parameter is chosen to ensure the stability of the velocity
-verlet integrator, the alpha parameter to make the influence of the current
-state on future states of the momentum variable to decay exponentially, and
-the delta parameter to maximize the acceptance of proposal but with good
-mixing properties for the slice variable. These characteristics are targeted
-by controlling heuristics based on the maximum eigenvalues of the correlation
-and gradient matrices of the cross-chain samples, under simpifyng assumptions.</p>
-<p>Good tuning is fundamental for the non-reversible Generalized HMC sampling
-algorithm to explore the target space efficienty and output uncorrelated, or
-as uncorrelated as possible, samples from the target space. Furthermore, the
-single integrator step of the algorithm lends itself for fast sampling
-on parallel computer architectures.</p>
+<p>Full implementation of Algorithm 3 from <span id="id2">[<a class="reference internal" href="../../../../bib.html#id14" title="Matthew D Hoffman and Pavel Sountsov. Tuning-free generalized hamiltonian monte carlo. In International Conference on Artificial Intelligence and Statistics, 7799–7813. PMLR, 2022.">HS22</a>]</span> with
+K-fold cross-chain adaptation and periodic chain shuffling.</p>
+<p>Chains are divided into <code class="docutils literal notranslate"><span class="pre">num_folds</span></code> folds. At adaptation step <code class="docutils literal notranslate"><span class="pre">t</span></code>,
+fold <code class="docutils literal notranslate"><span class="pre">t</span> <span class="pre">mod</span> <span class="pre">K</span></code> is frozen (its chains do not advance, Algorithm 3 line 4).
+For each active fold k, the step size is computed from fold <code class="docutils literal notranslate"><span class="pre">(k-1)</span> <span class="pre">mod</span> <span class="pre">K</span></code>’s
+preconditioned gradients, and the damping is computed from fold k’s own
+positions using that step size. Every K steps all chains are reshuffled
+randomly across folds to prevent fold-assignment bias.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>logdensity_fn</strong> – The log density probability density function from which we wish to sample.</p></li>
-<li><p><strong>num_chains</strong> – Number of chains used for cross-chain warm-up training.</p></li>
+<li><p><strong>num_chains</strong> – Total number of chains. Must be divisible by <code class="docutils literal notranslate"><span class="pre">num_folds</span></code>.</p></li>
+<li><p><strong>num_folds</strong> – Number of folds K to split chains into. Default is 4 as in the paper.</p></li>
+<li><p><strong>step_size_multiplier</strong> – Multiplicative factor for the step size heuristic. Default is 0.5 as in
+the paper.</p></li>
+<li><p><strong>damping_slowdown</strong> – Slows the damping decay relative to the iteration count. Default is 1.0
+as in the paper. Higher values force stronger damping in early iterations.</p></li>
 <li><p><strong>adaptation_info_fn</strong> – Function to select the adaptation info returned. See return_all_adapt_info
-and get_filter_adapt_info_fn in blackjax.adaptation.base.  By default all
+and get_filter_adapt_info_fn in blackjax.adaptation.base. By default all
 information is saved - this can result in excessive memory usage if the
 information is unused.</p></li>
 </ul>
@@ -525,7 +531,8 @@ information is unused.</p></li>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p><ul class="simple">
 <li><p><em>A function that returns the last cross-chain state, a sampling kernel with the</em></p></li>
-<li><p><em>tuned parameter values, and all the warm-up states for diagnostics.</em></p></li>
+<li><p><em>tuned parameter values (averaged across folds), and all the warm-up states for</em></p></li>
+<li><p><em>diagnostics.</em></p></li>
 </ul>
 </p>
 </dd>

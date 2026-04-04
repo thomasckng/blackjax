@@ -38,9 +38,10 @@ Y_rv = srng.binomial(group_size, theta_rv)
 [31m---------------------------------------------------------------------------[39m
 [31mAttributeError[39m                            Traceback (most recent call last)
 [36mCell[39m[36m [39m[32mIn[3][39m[32m, line 1[39m
-[32m----> [39m[32m1[39m [38;5;28;01mimport[39;00m[38;5;250m [39m[34;01maesara[39;00m
-[32m      2[39m [38;5;28;01mimport[39;00m[38;5;250m [39m[34;01maesara[39;00m[34;01m.[39;00m[34;01mtensor[39;00m[38;5;250m [39m[38;5;28;01mas[39;00m[38;5;250m [39m[34;01mat[39;00m
-[32m      4[39m [38;5;28;01mfrom[39;00m[38;5;250m [39m[34;01maeppl[39;00m[38;5;250m [39m[38;5;28;01mimport[39;00m joint_logprob
+[32m----> [39m[32m1[39m [38;5;28;01mimport[39;00m aesara
+[32m      2[39m [38;5;28;01mimport[39;00m aesara.tensor [38;5;28;01mas[39;00m at
+[32m      3[39m 
+[32m      4[39m [38;5;28;01mfrom[39;00m aeppl [38;5;28;01mimport[39;00m joint_logprob
 
 [36mFile [39m[32m/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/aesara/__init__.py:120[39m
 [32m    116[39m     [38;5;28;01mreturn[39;00m as_tensor_variable(x, **kwargs)

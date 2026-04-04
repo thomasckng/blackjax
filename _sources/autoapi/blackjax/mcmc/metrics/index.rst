@@ -30,6 +30,7 @@ Functions
 
    blackjax.mcmc.metrics.default_metric
    blackjax.mcmc.metrics.gaussian_euclidean
+   blackjax.mcmc.metrics.gaussian_euclidean_low_rank
    blackjax.mcmc.metrics.gaussian_riemannian
 
 
@@ -38,7 +39,7 @@ Module Contents
 
 .. py:function:: default_metric(metric: MetricTypes) -> Metric
 
-   Convert an input metric into a ``Metric`` object following sensible default rules
+   Convert an input metric into a ``Metric`` object following sensible default rules.
 
    The metric can be specified in three different ways:
 
@@ -47,6 +48,9 @@ Module Contents
      metric
    - A function that takes a coordinate position and returns the mass matrix at that
      location
+
+   :returns: * A ``Metric`` object with ``sample_momentum``, ``kinetic_energy``,
+             * ``check_turning``, and ``scale`` fields.
 
 
 .. py:function:: gaussian_euclidean(inverse_mass_matrix: blackjax.types.Array) -> Metric
@@ -75,5 +79,42 @@ Module Contents
                itself given the values of the momentum along the trajectory.
 
 
+.. py:function:: gaussian_euclidean_low_rank(sigma: blackjax.types.Array, U: blackjax.types.Array, lam: blackjax.types.Array) -> Metric
+
+   Euclidean metric with low-rank-modified mass matrix :cite:p:`sountsov2025preconditioning`.
+
+   The inverse mass matrix has the form
+
+   .. math::
+
+       M^{-1} = \operatorname{diag}(\sigma)
+                \bigl(I + U(\Lambda - I)U^\top\bigr)
+                \operatorname{diag}(\sigma)
+
+   where :math:`\sigma \in \mathbb{R}^d_{>0}` is a diagonal scaling,
+   :math:`U \in \mathbb{R}^{d \times k}` has orthonormal columns, and
+   :math:`\Lambda = \operatorname{diag}(\lambda)` with :math:`\lambda > 0`.
+   When :math:`\lambda = \mathbf{1}` the metric reduces to a diagonal metric
+   with scale :math:`\sigma`.  All HMC operations are :math:`O(dk)`, making
+   this efficient when :math:`k \ll d`.
+
+   :param sigma: Shape ``(d,)``.  Positive diagonal scaling; plays the role of marginal
+                 standard deviations.
+   :param U: Shape ``(d, k)``.  Matrix with orthonormal columns spanning the
+             low-rank correction subspace.
+   :param lam: Shape ``(k,)``.  Positive eigenvalues for the low-rank correction.
+
+   :rtype: A ``Metric`` object whose operations all run in :math:`O(dk)`.
+
+
 .. py:function:: gaussian_riemannian(mass_matrix_fn: Callable) -> Metric
+
+   Hamiltonian dynamic on Riemannian manifold with normally-distributed momentum.
+
+   :param mass_matrix_fn: A callable that takes a position and returns the mass matrix at that
+                          location (positive definite, one or two-dimensional array).
+
+   :returns: * A ``Metric`` object with ``sample_momentum``, ``kinetic_energy``,
+             * ``check_turning``, and ``scale`` fields.
+
 

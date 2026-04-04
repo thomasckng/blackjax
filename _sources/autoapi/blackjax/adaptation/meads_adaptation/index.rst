@@ -31,16 +31,17 @@ Module Contents
 
    State of the MEADS adaptation scheme.
 
+   current_iteration
+       Current iteration of the adaptation.
    step_size
-       Value of the step_size parameter of the generalized HMC algorithm.
+       Step size for each fold, shape (num_folds,).
    position_sigma
-       PyTree containing the per dimension sample standard deviation of the
-       position variable. Used to scale the momentum variable on the generalized
-       HMC algorithm.
+       PyTree with per-fold per-dimension sample standard deviation of the
+       position variable, leading axis has size num_folds.
    alpha
-       Value of the alpha parameter of the generalized HMC algorithm.
+       Alpha parameter (momentum persistence) for each fold, shape (num_folds,).
    delta
-       Value of the delta parameter of the generalized HMC algorithm.
+       Delta parameter (slice translation) for each fold, shape (num_folds,).
 
 
 
@@ -49,7 +50,7 @@ Module Contents
 
 
    .. py:attribute:: step_size
-      :type:  float
+      :type:  blackjax.types.Array
 
 
    .. py:attribute:: position_sigma
@@ -57,66 +58,63 @@ Module Contents
 
 
    .. py:attribute:: alpha
-      :type:  float
+      :type:  blackjax.types.Array
 
 
    .. py:attribute:: delta
-      :type:  float
+      :type:  blackjax.types.Array
 
 
-.. py:function:: base()
+.. py:function:: base(num_folds: int = 4, step_size_multiplier: float = 0.5, damping_slowdown: float = 1.0)
 
    Maximum-Eigenvalue Adaptation of damping and step size for the generalized
    Hamiltonian Monte Carlo kernel :cite:p:`hoffman2022tuning`.
 
+   Full implementation of Algorithm 3 with K-fold cross-chain adaptation and
+   chain shuffling. Chains are divided into ``num_folds`` folds; at each step
+   statistics from fold ``t mod K`` are used to update the parameters for fold
+   ``(t+1) mod K``. Every K steps all chains are reshuffled across folds.
 
-   This algorithm performs a cross-chain adaptation scheme for the generalized
-   HMC algorithm that automatically selects values for the generalized HMC's
-   tunable parameters based on statistics collected from a population of many
-   chains. It uses heuristics determined by the maximum eigenvalue of the
-   covariance and gradient matrices given by the grouped samples of all chains
-   with shape.
+   :param num_folds: Number of folds K to split chains into. Must divide num_chains evenly.
+   :param step_size_multiplier: Multiplicative factor applied to the raw step size heuristic (default 0.5
+                                as in the paper).
+   :param damping_slowdown: Controls the damping floor in early iterations. The floor on γ is
+                            ``damping_slowdown / (t·ε)``, so higher values force stronger damping
+                            (higher α) in early iterations. Default is 1.0 as in the paper.
 
-   This is an implementation of Algorithm 3 of :cite:p:`hoffman2022tuning` using cross-chain
-   adaptation instead of parallel ensemble chain adaptation.
-
-   :returns: * *init* -- Function that initializes the warmup.
-             * *update* -- Function that moves the warmup one step.
+   :returns: * *init* -- Function that initializes the warmup state.
+             * *update* -- Function that moves the warmup one step forward.
 
 
-.. py:function:: meads_adaptation(logdensity_fn: Callable, num_chains: int, adaptation_info_fn: Callable = return_all_adapt_info) -> blackjax.base.AdaptationAlgorithm
+.. py:function:: meads_adaptation(logdensity_fn: Callable, num_chains: int, num_folds: int = 4, step_size_multiplier: float = 0.5, damping_slowdown: float = 1.0, adaptation_info_fn: Callable = return_all_adapt_info) -> blackjax.base.AdaptationAlgorithm
 
    Adapt the parameters of the Generalized HMC algorithm.
 
-   The Generalized HMC algorithm depends on three parameters, each controlling
-   one element of its behaviour: step size controls the integrator's dynamics,
-   alpha controls the persistency of the momentum variable, and delta controls
-   the deterministic transformation of the slice variable used to perform the
-   non-reversible Metropolis-Hastings accept/reject step.
+   Full implementation of Algorithm 3 from :cite:p:`hoffman2022tuning` with
+   K-fold cross-chain adaptation and periodic chain shuffling.
 
-   The step size parameter is chosen to ensure the stability of the velocity
-   verlet integrator, the alpha parameter to make the influence of the current
-   state on future states of the momentum variable to decay exponentially, and
-   the delta parameter to maximize the acceptance of proposal but with good
-   mixing properties for the slice variable. These characteristics are targeted
-   by controlling heuristics based on the maximum eigenvalues of the correlation
-   and gradient matrices of the cross-chain samples, under simpifyng assumptions.
-
-   Good tuning is fundamental for the non-reversible Generalized HMC sampling
-   algorithm to explore the target space efficienty and output uncorrelated, or
-   as uncorrelated as possible, samples from the target space. Furthermore, the
-   single integrator step of the algorithm lends itself for fast sampling
-   on parallel computer architectures.
+   Chains are divided into ``num_folds`` folds. At adaptation step ``t``,
+   fold ``t mod K`` is frozen (its chains do not advance, Algorithm 3 line 4).
+   For each active fold k, the step size is computed from fold ``(k-1) mod K``'s
+   preconditioned gradients, and the damping is computed from fold k's own
+   positions using that step size. Every K steps all chains are reshuffled
+   randomly across folds to prevent fold-assignment bias.
 
    :param logdensity_fn: The log density probability density function from which we wish to sample.
-   :param num_chains: Number of chains used for cross-chain warm-up training.
+   :param num_chains: Total number of chains. Must be divisible by ``num_folds``.
+   :param num_folds: Number of folds K to split chains into. Default is 4 as in the paper.
+   :param step_size_multiplier: Multiplicative factor for the step size heuristic. Default is 0.5 as in
+                                the paper.
+   :param damping_slowdown: Slows the damping decay relative to the iteration count. Default is 1.0
+                            as in the paper. Higher values force stronger damping in early iterations.
    :param adaptation_info_fn: Function to select the adaptation info returned. See return_all_adapt_info
-                              and get_filter_adapt_info_fn in blackjax.adaptation.base.  By default all
+                              and get_filter_adapt_info_fn in blackjax.adaptation.base. By default all
                               information is saved - this can result in excessive memory usage if the
                               information is unused.
 
    :returns: * *A function that returns the last cross-chain state, a sampling kernel with the*
-             * *tuned parameter values, and all the warm-up states for diagnostics.*
+             * *tuned parameter values (averaged across folds), and all the warm-up states for*
+             * *diagnostics.*
 
 
 .. py:function:: maximum_eigenvalue(matrix: blackjax.types.ArrayLikeTree) -> blackjax.types.Array

@@ -55,7 +55,7 @@
     <link rel="prev" title="blackjax.vi.schrodinger_follmer" href="../schrodinger_follmer/index.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="0.1.dev1+gca4514fc9" />
+  <meta name="docsearch:version" content="0.1.dev1+g023ff19bf" />
   </head>
   
   
@@ -180,6 +180,7 @@
 <li class="toctree-l3"><a class="reference internal" href="../../adaptation/chees_adaptation/index.html">blackjax.adaptation.chees_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../adaptation/laps/index.html">blackjax.adaptation.laps</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../adaptation/laps_burn_in/index.html">blackjax.adaptation.laps_burn_in</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../adaptation/low_rank_adaptation/index.html">blackjax.adaptation.low_rank_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../adaptation/mass_matrix/index.html">blackjax.adaptation.mass_matrix</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../adaptation/mclmc_adaptation/index.html">blackjax.adaptation.mclmc_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../adaptation/meads_adaptation/index.html">blackjax.adaptation.meads_adaptation</a></li>
@@ -243,7 +244,9 @@
 </ul>
 </details></li>
 <li class="toctree-l2 current active has-children"><a class="reference internal" href="../index.html">blackjax.vi</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../fullrank_vi/index.html">blackjax.vi.fullrank_vi</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../meanfield_vi/index.html">blackjax.vi.meanfield_vi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../multipathfinder/index.html">blackjax.vi.multipathfinder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../pathfinder/index.html">blackjax.vi.pathfinder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../schrodinger_follmer/index.html">blackjax.vi.schrodinger_follmer</a></li>
 <li class="toctree-l3 current active"><a class="current reference internal" href="#">blackjax.vi.svgd</a></li>
@@ -394,10 +397,10 @@
 <td><p>Initializes Stein Variational Gradient Descent Algorithm.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#blackjax.vi.svgd.build_kernel" title="blackjax.vi.svgd.build_kernel"><code class="xref py py-obj docutils literal notranslate"><span class="pre">build_kernel</span></code></a>(optimizer)</p></td>
-<td><p></p></td>
+<td><p>Build a SVGD kernel.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#blackjax.vi.svgd.rbf_kernel" title="blackjax.vi.svgd.rbf_kernel"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rbf_kernel</span></code></a>(x, y[, length_scale])</p></td>
-<td><p></p></td>
+<td><p>Radial basis function (RBF / squared-exponential) kernel.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#blackjax.vi.svgd.update_median_heuristic" title="blackjax.vi.svgd.update_median_heuristic"><code class="xref py py-obj docutils literal notranslate"><span class="pre">update_median_heuristic</span></code></a>(→ SVGDState)</p></td>
 <td><p>Median heuristic for setting the bandwidth of RBF kernels.</p></td>
@@ -418,10 +421,13 @@
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>initial_particles</strong> – Initial set of particles to start the optimization</p></li>
-<li><p><strong>kernel_paremeters</strong> – Arguments to the kernel function</p></li>
-<li><p><strong>optimizer</strong> – Optax compatible optimizer, which conforms to the <cite>optax.GradientTransformation</cite> protocol</p></li>
+<li><p><strong>initial_particles</strong> – Initial set of particles to start the optimization.</p></li>
+<li><p><strong>kernel_parameters</strong> – Arguments to the kernel function.</p></li>
+<li><p><strong>optimizer</strong> – Optax compatible optimizer, which conforms to the <code class="docutils literal notranslate"><span class="pre">optax.GradientTransformation</span></code> protocol.</p></li>
 </ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Initial SVGDState with the given particles, kernel parameters, and optimizer state.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -429,20 +435,58 @@
 <dl class="py function">
 <dt class="sig sig-object py" id="blackjax.vi.svgd.build_kernel">
 <span class="sig-name descname"><span class="pre">build_kernel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">optimizer</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">optax.GradientTransformation</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../../../_modules/blackjax/vi/svgd.html#build_kernel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.vi.svgd.build_kernel" title="Link to this definition">#</a></dt>
-<dd></dd></dl>
+<dd><p>Build a SVGD kernel.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>optimizer</strong> – Optax optimizer used to apply the functional gradient update.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p>A <code class="docutils literal notranslate"><span class="pre">kernel(state,</span> <span class="pre">grad_logdensity_fn,</span> <span class="pre">kernel,</span> <span class="pre">\*\*grad_params)</span> <span class="pre">-&gt;</span> <span class="pre">SVGDState</span></code></p></li>
+<li><p><em>function that performs one SVGD step.</em></p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="blackjax.vi.svgd.rbf_kernel">
 <span class="sig-name descname"><span class="pre">rbf_kernel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">length_scale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../../../_modules/blackjax/vi/svgd.html#rbf_kernel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.vi.svgd.rbf_kernel" title="Link to this definition">#</a></dt>
-<dd></dd></dl>
+<dd><p>Radial basis function (RBF / squared-exponential) kernel.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – First particle (PyTree).</p></li>
+<li><p><strong>y</strong> – Second particle (PyTree).</p></li>
+<li><p><strong>length_scale</strong> – Bandwidth of the kernel. Larger values produce smoother kernels.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Scalar kernel evaluation <code class="docutils literal notranslate"><span class="pre">exp(-||x</span> <span class="pre">-</span> <span class="pre">y||^2</span> <span class="pre">/</span> <span class="pre">length_scale)</span></code>.</p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="blackjax.vi.svgd.update_median_heuristic">
 <span class="sig-name descname"><span class="pre">update_median_heuristic</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SVGDState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">SVGDState</span></span></span><a class="reference internal" href="../../../../_modules/blackjax/vi/svgd.html#update_median_heuristic"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.vi.svgd.update_median_heuristic" title="Link to this definition">#</a></dt>
 <dd><p>Median heuristic for setting the bandwidth of RBF kernels.</p>
-<p>A reasonable middle-ground for choosing the <cite>length_scale</cite> of the RBF kernel
-is to pick the empirical median of the squared distance between particles.
-This strategy is called the median heuristic.</p>
+<p>A reasonable middle-ground for choosing the <code class="docutils literal notranslate"><span class="pre">length_scale</span></code> of the RBF
+kernel is to pick the empirical median of the squared distance between
+particles. This strategy is called the median heuristic.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>state</strong> – Current SVGDState whose particles are used to compute the heuristic.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p>Updated SVGDState with <code class="docutils literal notranslate"><span class="pre">kernel_parameters[&quot;length_scale&quot;]</span></code> set via</p></li>
+<li><p><em>the median heuristic.</em></p></li>
+</ul>
+</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py function">

@@ -56,7 +56,7 @@
     <link rel="prev" title="Use with TFP models" href="howto_use_tfp.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="0.1.dev1+gca4514fc9" />
+  <meta name="docsearch:version" content="0.1.dev1+g023ff19bf" />
   </head>
   
   
@@ -181,6 +181,7 @@
 <li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/adaptation/chees_adaptation/index.html">blackjax.adaptation.chees_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/adaptation/laps/index.html">blackjax.adaptation.laps</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/adaptation/laps_burn_in/index.html">blackjax.adaptation.laps_burn_in</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/adaptation/low_rank_adaptation/index.html">blackjax.adaptation.low_rank_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/adaptation/mass_matrix/index.html">blackjax.adaptation.mass_matrix</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/adaptation/mclmc_adaptation/index.html">blackjax.adaptation.mclmc_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/adaptation/meads_adaptation/index.html">blackjax.adaptation.meads_adaptation</a></li>
@@ -244,7 +245,9 @@
 </ul>
 </details></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../autoapi/blackjax/vi/index.html">blackjax.vi</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/vi/fullrank_vi/index.html">blackjax.vi.fullrank_vi</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/vi/meanfield_vi/index.html">blackjax.vi.meanfield_vi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/vi/multipathfinder/index.html">blackjax.vi.multipathfinder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/vi/pathfinder/index.html">blackjax.vi.pathfinder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/vi/schrodinger_follmer/index.html">blackjax.vi.schrodinger_follmer</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/vi/svgd/index.html">blackjax.vi.svgd</a></li>
@@ -368,11 +371,8 @@
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#vectorization-vs-parallelization">Vectorization vs parallelization</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#nuts-in-parallel">NUTS in parallel</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#using-jax-vmap">Using <code class="docutils literal notranslate"><span class="pre">jax.vmap</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#using-jax-pmap">Using <code class="docutils literal notranslate"><span class="pre">jax.pmap</span></code></a><ul class="nav section-nav flex-column">
-<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#a-note-on-using-jax-pmap-on-cpu">A note on using <code class="docutils literal notranslate"><span class="pre">jax.pmap</span></code> on CPU</a><ul class="nav section-nav flex-column">
-<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#choosing-the-number-of-devices">Choosing the number of devices</a></li>
-</ul>
-</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#using-jax-s-sharding-api">Using JAX’s sharding API</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#a-note-on-using-the-sharding-api-on-cpu">A note on using the sharding API on CPU</a></li>
 </ul>
 </li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#back-to-our-example">Back to our example</a></li>
@@ -398,10 +398,10 @@
 <p><code class="docutils literal notranslate"><span class="pre">JAX</span></code> provides two distinct primitives to “run things in parallel”, and it is important to understand the difference to make the best use of Blackjax:</p>
 <ul class="simple">
 <li><p><a class="reference external" href="https://jax.readthedocs.io/en/latest/jax.html?highlight=vmap#jax.vmap">jax.vmap</a> is used to SIMD vectorize <code class="docutils literal notranslate"><span class="pre">JAX</span></code> code. It is important to remember that vectorization happens at the <em>instruction level</em>, each CPU or GPU  instruction will the process the information from your different chains, <em>one intructions at a time</em>. This can have some unexpected consequences;</p></li>
-<li><p><a class="reference external" href="https://jax.readthedocs.io/en/latest/_autosummary/jax.pmap.html#jax.pmap">jax.pmap</a> is a higher level abstraction, where processes are split across multiple devices: GPUs, TPUs, or CPU cores.</p></li>
+<li><p>JAX’s <a class="reference external" href="https://docs.jax.dev/en/latest/sharding.html">sharding API</a> is a higher-level abstraction where computation is distributed across multiple devices (GPUs, TPUs, or CPU cores) by annotating arrays with a <code class="docutils literal notranslate"><span class="pre">NamedSharding</span></code>. This replaces the now-deprecated <code class="docutils literal notranslate"><span class="pre">jax.pmap</span></code>.</p></li>
 </ul>
-<p>For detailed walkthrough both primitives we invite your to read JAX’s tutorials on <a class="reference external" href="https://jax.readthedocs.io/en/latest/jax-101/03-vectorization.html">Automatic Vectorization</a>
-and <a class="reference external" href="https://jax.readthedocs.io/en/latest/jax-101/06-parallelism.html">Parallel Evaluation</a>.</p>
+<p>For detailed walkthroughs of both primitives we invite you to read JAX’s tutorials on <a class="reference external" href="https://jax.readthedocs.io/en/latest/jax-101/03-vectorization.html">Automatic Vectorization</a>
+and <a class="reference external" href="https://docs.jax.dev/en/latest/notebooks/Distributed_arrays_and_automatic_parallelization.html">Distributed arrays and automatic parallelism</a>.</p>
 </section>
 <section id="nuts-in-parallel">
 <h2>NUTS in parallel<a class="headerlink" href="#nuts-in-parallel" title="Link to this heading">#</a></h2>
@@ -469,7 +469,7 @@ and <a class="reference external" href="https://jax.readthedocs.io/en/latest/jax
 </div>
 </div>
 </div>
-<p>And finally, to put <code class="docutils literal notranslate"><span class="pre">jax.vmap</span></code> and <code class="docutils literal notranslate"><span class="pre">jax.pmap</span></code> on an equal foot we sample as many chains as the machine has CPU cores:</p>
+<p>And finally, to compare <code class="docutils literal notranslate"><span class="pre">jax.vmap</span></code> against device-parallel execution we sample as many chains as the machine has CPU cores:</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">multiprocessing</span>
@@ -525,7 +525,7 @@ and <a class="reference external" href="https://jax.readthedocs.io/en/latest/jax
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>CPU times: user 22 s, sys: 284 ms, total: 22.2 s
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>CPU times: user 22.1 s, sys: 260 ms, total: 22.3 s
 Wall time: 19.7 s
 </pre></div>
 </div>
@@ -538,13 +538,13 @@ Wall time: 19.7 s
 <p>You may be thinking that instead of applying <code class="docutils literal notranslate"><span class="pre">jax.vmap</span></code> to <code class="docutils literal notranslate"><span class="pre">one_step</span></code> we could apply it to the <code class="docutils literal notranslate"><span class="pre">inference_loop_multiple_chains</span></code>, and the chains will run independently. Unfortunately, this is not how SIMD vectorization work although, granted, JAX’s user interface could led you to think otherwise.</p>
 </div>
 </section>
-<section id="using-jax-pmap">
-<h3>Using <code class="docutils literal notranslate"><span class="pre">jax.pmap</span></code><a class="headerlink" href="#using-jax-pmap" title="Link to this heading">#</a></h3>
-<p>Now you may be thinking: we are limited by one chain if we synchronize at the step level, but things being random, chains that run truly in parallel should take in total roughly similar numbers of integration steps. So <code class="docutils literal notranslate"><span class="pre">jax.pmap</span></code> should help here. This is true, let’s prove it!</p>
-<section id="a-note-on-using-jax-pmap-on-cpu">
-<h4>A note on using <code class="docutils literal notranslate"><span class="pre">jax.pmap</span></code> on CPU<a class="headerlink" href="#a-note-on-using-jax-pmap-on-cpu" title="Link to this heading">#</a></h4>
+<section id="using-jax-s-sharding-api">
+<h3>Using JAX’s sharding API<a class="headerlink" href="#using-jax-s-sharding-api" title="Link to this heading">#</a></h3>
+<p>Now you may be thinking: we are limited by one chain if we synchronize at the step level, but things being random, chains that run truly in parallel should take in total roughly similar numbers of integration steps. So running chains on separate devices should help here. This is true, let’s prove it!</p>
+<section id="a-note-on-using-the-sharding-api-on-cpu">
+<h4>A note on using the sharding API on CPU<a class="headerlink" href="#a-note-on-using-the-sharding-api-on-cpu" title="Link to this heading">#</a></h4>
 <p>JAX will treat your CPU as a single device by default, regardless of the number of cores available.</p>
-<p>Unfortunately, this means that using <code class="docutils literal notranslate"><span class="pre">pmap</span></code> is not possible out of the box – we’ll first need
+<p>Unfortunately, this means that multi-device parallelism is not possible out of the box – we’ll first need
 to instruct JAX to split the CPU into multiple devices. See <a class="reference external" href="https://github.com/google/jax/issues/1408">this issue</a> for more discussion on this topic.</p>
 <p>Currently, this can only be done via <code class="docutils literal notranslate"><span class="pre">XLA_FLAGS</span></code> environmental variable.</p>
 <div class="admonition warning">
@@ -559,7 +559,7 @@ to instruct JAX to split the CPU into multiple devices. See <a class="reference 
 <span class="p">)</span>
 </pre></div>
 </div>
-<p>We advise you to confirm that JAX has successfuly recognized our CPU as multiple devices with the following command before moving forward:</p>
+<p>We advise you to confirm that JAX has successfully recognized our CPU as multiple devices with the following command before moving forward:</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nb">len</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">devices</span><span class="p">())</span>
@@ -572,75 +572,75 @@ to instruct JAX to split the CPU into multiple devices. See <a class="reference 
 </div>
 </div>
 </div>
-<section id="choosing-the-number-of-devices">
-<h5>Choosing the number of devices<a class="headerlink" href="#choosing-the-number-of-devices" title="Link to this heading">#</a></h5>
-<p><code class="docutils literal notranslate"><span class="pre">jax.pmap</span></code> has one more limitation: it is not able to parallelize the execution when you ask it to perform more computations than there are available deviced. The following code snippet asks <code class="docutils literal notranslate"><span class="pre">jax.pmap</span></code> perform 1024 operations in parallel:</p>
-<div class="cell docutils container">
-<div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">fn</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">x</span> <span class="o">+</span> <span class="mi">1</span>
-
-<span class="k">try</span><span class="p">:</span>
-    <span class="n">data</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1024</span><span class="p">)</span>
-    <span class="n">parallel_fn</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">pmap</span><span class="p">(</span><span class="n">fn</span><span class="p">)</span>
-    <span class="n">parallel_fn</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
-<span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
-</pre></div>
-</div>
-</div>
-<div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>cannot select an axis to squeeze out which has size not equal to one, got shape=(256,) and dimensions=(0,)
-</pre></div>
-</div>
-</div>
-</div>
-<p>This means that you will only be able to run as many MCMC chains as you have CPU cores. See this <a class="reference external" href="https://github.com/google/jax/discussions/4198">question</a> for a more detailed discussion,
-and a workaround involving nesting <code class="docutils literal notranslate"><span class="pre">jax.pmap</span></code> and <code class="docutils literal notranslate"><span class="pre">jax.vmap</span></code> calls.</p>
-<p>Another option (we advise against) is to set the device count to a number larger than the core count, e.g. <code class="docutils literal notranslate"><span class="pre">200</span></code>, but it’s <a class="reference external" href="https://github.com/google/jax/issues/1408#issuecomment-536158048">unclear what side effects it might have</a>.</p>
-</section>
 </section>
 </section>
 <section id="back-to-our-example">
 <h3>Back to our example<a class="headerlink" href="#back-to-our-example" title="Link to this heading">#</a></h3>
-<p>In case of <code class="docutils literal notranslate"><span class="pre">jax.pmap</span></code>, we apply the transformation directly to the original <code class="docutils literal notranslate"><span class="pre">inference_loop</span></code> function.</p>
+<p>JAX’s sharding API (introduced as the replacement for the deprecated <code class="docutils literal notranslate"><span class="pre">jax.pmap</span></code>) lets us distribute computation across devices using <code class="docutils literal notranslate"><span class="pre">jax.shard_map</span></code>. This runs the function independently on each device, one chain per device.</p>
+<p>The recipe is:</p>
+<ol class="arabic simple">
+<li><p>Create a <code class="docutils literal notranslate"><span class="pre">Mesh</span></code> that names the device axis <code class="docutils literal notranslate"><span class="pre">'chain'</span></code>.</p></li>
+<li><p>Shard the per-chain inputs (RNG keys and initial states) with <code class="docutils literal notranslate"><span class="pre">jax.device_put</span></code>.</p></li>
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">jax.shard_map</span></code> to dispatch one chain per device, then compile with <code class="docutils literal notranslate"><span class="pre">jax.jit</span></code>.</p></li>
+</ol>
+<p>Inside <code class="docutils literal notranslate"><span class="pre">shard_map</span></code>, each device receives a <code class="docutils literal notranslate"><span class="pre">(1,</span> <span class="pre">...)</span></code> slice of the input, so we squeeze the leading axis on the way in and restore it on the way out.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">inference_loop_multiple_chains</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">pmap</span><span class="p">(</span><span class="n">inference_loop</span><span class="p">,</span> <span class="n">in_axes</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="n">static_broadcasted_argnums</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">jax.sharding</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mesh</span><span class="p">,</span> <span class="n">NamedSharding</span><span class="p">,</span> <span class="n">PartitionSpec</span> <span class="k">as</span> <span class="n">P</span>
+
+<span class="n">mesh</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">make_mesh</span><span class="p">((</span><span class="n">num_chains</span><span class="p">,),</span> <span class="p">(</span><span class="s1">&#39;chain&#39;</span><span class="p">,))</span>
+<span class="n">sharding</span> <span class="o">=</span> <span class="n">NamedSharding</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="n">P</span><span class="p">(</span><span class="s1">&#39;chain&#39;</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">rng_key</span><span class="p">,</span> <span class="n">sample_key</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">rng_key</span><span class="p">)</span>
+<span class="n">sample_keys</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">device_put</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">sample_key</span><span class="p">,</span> <span class="n">num_chains</span><span class="p">),</span> <span class="n">sharding</span><span class="p">)</span>
+<span class="n">initial_states_sharded</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">device_put</span><span class="p">(</span><span class="n">initial_states</span><span class="p">,</span> <span class="n">sharding</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 </div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>We could have done that in the <code class="docutils literal notranslate"><span class="pre">jax.vmap</span></code> example (and it wouldn’t have helped), but we prefered to highlight in the code the fact that vectorization happens at the instruction level.</p>
+<p>You can inspect the sharding with <code class="docutils literal notranslate"><span class="pre">jax.debug.visualize_array_sharding(initial_states_sharded.position[&quot;loc&quot;])</span></code> to confirm each chain is on its own device.</p>
 </div>
-<p>We are now ready to sample:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">run_one_chain</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">inference_loop</span><span class="p">(</span><span class="n">key</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">nuts</span><span class="o">.</span><span class="n">step</span><span class="p">,</span> <span class="n">jax</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">state</span><span class="p">),</span> <span class="mi">2_000</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">jax</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="kc">None</span><span class="p">],</span> <span class="n">result</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="o">%%time</span>
-<span class="n">rng_key</span><span class="p">,</span> <span class="n">sample_key</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">rng_key</span><span class="p">)</span>
-<span class="n">sample_keys</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">sample_key</span><span class="p">,</span> <span class="n">num_chains</span><span class="p">)</span>
-
-<span class="n">pmap_states</span> <span class="o">=</span> <span class="n">inference_loop_multiple_chains</span><span class="p">(</span>
-    <span class="n">sample_keys</span><span class="p">,</span> <span class="n">nuts</span><span class="o">.</span><span class="n">step</span><span class="p">,</span> <span class="n">initial_states</span><span class="p">,</span> <span class="mi">2_000</span>
-<span class="p">)</span>
-<span class="n">_</span> <span class="o">=</span> <span class="n">pmap_states</span><span class="o">.</span><span class="n">position</span><span class="p">[</span><span class="s2">&quot;loc&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">block_until_ready</span><span class="p">()</span>
+<span class="n">sharded_states</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">shard_map</span><span class="p">(</span>
+    <span class="n">run_one_chain</span><span class="p">,</span>
+    <span class="n">mesh</span><span class="o">=</span><span class="n">mesh</span><span class="p">,</span>
+    <span class="n">in_specs</span><span class="o">=</span><span class="p">(</span><span class="n">P</span><span class="p">(</span><span class="s1">&#39;chain&#39;</span><span class="p">),</span> <span class="n">P</span><span class="p">(</span><span class="s1">&#39;chain&#39;</span><span class="p">)),</span>
+    <span class="n">out_specs</span><span class="o">=</span><span class="n">P</span><span class="p">(</span><span class="s1">&#39;chain&#39;</span><span class="p">),</span>
+    <span class="n">check_vma</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">))(</span><span class="n">sample_keys</span><span class="p">,</span> <span class="n">initial_states_sharded</span><span class="p">)</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">sharded_states</span><span class="o">.</span><span class="n">position</span><span class="p">[</span><span class="s2">&quot;loc&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">block_until_ready</span><span class="p">()</span>
 </pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>CPU times: user 43.8 s, sys: 98.5 ms, total: 43.9 s
-Wall time: 11.9 s
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>CPU times: user 43.3 s, sys: 100 ms, total: 43.4 s
+Wall time: 11.5 s
 </pre></div>
 </div>
 </div>
 </div>
-<p>Wow, this was much faster, our intuition was correct! Note that the samples are transposed compared to the ones obtained with <code class="docutils literal notranslate"><span class="pre">jax.vmap</span></code>.</p>
-<p>Also, note how the shape of the posterior samples are different:</p>
+<p>Wow, this was much faster, our intuition was correct! Note that the sample shape is <code class="docutils literal notranslate"><span class="pre">(num_chains,</span> <span class="pre">num_samples)</span></code>, the same convention as the <code class="docutils literal notranslate"><span class="pre">jax.vmap</span></code> example.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">states</span><span class="o">.</span><span class="n">position</span><span class="p">[</span><span class="s2">&quot;loc&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">pmap_states</span><span class="o">.</span><span class="n">position</span><span class="p">[</span><span class="s2">&quot;loc&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">states</span><span class="o">.</span><span class="n">position</span><span class="p">[</span><span class="s2">&quot;loc&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">sharded_states</span><span class="o">.</span><span class="n">position</span><span class="p">[</span><span class="s2">&quot;loc&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span>
 </pre></div>
 </div>
 </div>
@@ -653,8 +653,8 @@ Wall time: 11.9 s
 </section>
 <section id="conclusions">
 <h3>Conclusions<a class="headerlink" href="#conclusions" title="Link to this heading">#</a></h3>
-<p>In this example the different between <code class="docutils literal notranslate"><span class="pre">jax.vmap</span></code> and <code class="docutils literal notranslate"><span class="pre">jax.pmap</span></code> is dramatic: it takes several minutes to <code class="docutils literal notranslate"><span class="pre">jax.vmap</span></code> and a few seconds for <code class="docutils literal notranslate"><span class="pre">jax.pmap</span></code> to sample the same number of chains. This is expected for NUTS, and other adaptive algorithms: each chain runs a different number of internal steps for each sample generated and we need to wait for the slowest chain.</p>
-<p>We saw one possible solutions for those who just want a few chains to run diagnostics: parallelize using <code class="docutils literal notranslate"><span class="pre">jax.pmap</span></code>. For the thousands of chains we mentionned earlier you will need something different: either distribute on several machine (expensive), or design new algorithms altogether. HMC, for instance, runs the same number of integration steps on every chain and thus doesn’t exhibit the same synchronization problem. That’s the idea behind algorithms like ChEEs and MEADS! This is a very active area of research, and now you understand why.</p>
+<p>In this example the difference between <code class="docutils literal notranslate"><span class="pre">jax.vmap</span></code> and the sharding API is dramatic: it takes several minutes with <code class="docutils literal notranslate"><span class="pre">jax.vmap</span></code> and a few seconds with device-parallel execution to sample the same number of chains. This is expected for NUTS, and other adaptive algorithms: each chain runs a different number of internal steps for each sample generated and we need to wait for the slowest chain.</p>
+<p>We saw one possible solution for those who just want a few chains to run diagnostics: distribute chains across devices using JAX’s sharding API. For the thousands of chains we mentioned earlier you will need something different: either distribute on several machines (expensive), or design new algorithms altogether. HMC, for instance, runs the same number of integration steps on every chain and thus doesn’t exhibit the same synchronization problem. That’s the idea behind algorithms like ChEEs and MEADS! This is a very active area of research, and now you understand why.</p>
 </section>
 </section>
 </section>
@@ -709,11 +709,8 @@ Wall time: 11.9 s
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#vectorization-vs-parallelization">Vectorization vs parallelization</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#nuts-in-parallel">NUTS in parallel</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#using-jax-vmap">Using <code class="docutils literal notranslate"><span class="pre">jax.vmap</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#using-jax-pmap">Using <code class="docutils literal notranslate"><span class="pre">jax.pmap</span></code></a><ul class="nav section-nav flex-column">
-<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#a-note-on-using-jax-pmap-on-cpu">A note on using <code class="docutils literal notranslate"><span class="pre">jax.pmap</span></code> on CPU</a><ul class="nav section-nav flex-column">
-<li class="toc-h5 nav-item toc-entry"><a class="reference internal nav-link" href="#choosing-the-number-of-devices">Choosing the number of devices</a></li>
-</ul>
-</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#using-jax-s-sharding-api">Using JAX’s sharding API</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#a-note-on-using-the-sharding-api-on-cpu">A note on using the sharding API on CPU</a></li>
 </ul>
 </li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#back-to-our-example">Back to our example</a></li>

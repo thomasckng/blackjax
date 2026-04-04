@@ -18,3 +18,16 @@ Submodules
    /autoapi/blackjax/vi/index
 
 
+Attributes
+----------
+
+.. autoapisummary::
+
+   blackjax.multipathfinder
+
+
+Package Contents
+----------------
+
+.. py:data:: multipathfinder
+

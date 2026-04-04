@@ -52,7 +52,7 @@
     <link rel="search" title="Search" href="../../../search.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="0.1.dev1+gca4514fc9" />
+  <meta name="docsearch:version" content="0.1.dev1+g023ff19bf" />
   </head>
   
   
@@ -179,6 +179,7 @@
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/chees_adaptation/index.html">blackjax.adaptation.chees_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/laps/index.html">blackjax.adaptation.laps</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/laps_burn_in/index.html">blackjax.adaptation.laps_burn_in</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/low_rank_adaptation/index.html">blackjax.adaptation.low_rank_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/mass_matrix/index.html">blackjax.adaptation.mass_matrix</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/mclmc_adaptation/index.html">blackjax.adaptation.mclmc_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/meads_adaptation/index.html">blackjax.adaptation.meads_adaptation</a></li>
@@ -242,7 +243,9 @@
 </ul>
 </details></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../../../autoapi/blackjax/vi/index.html">blackjax.vi</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/vi/fullrank_vi/index.html">blackjax.vi.fullrank_vi</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/vi/meanfield_vi/index.html">blackjax.vi.meanfield_vi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/vi/multipathfinder/index.html">blackjax.vi.multipathfinder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/vi/pathfinder/index.html">blackjax.vi.pathfinder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/vi/schrodinger_follmer/index.html">blackjax.vi.schrodinger_follmer</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/vi/svgd/index.html">blackjax.vi.svgd</a></li>
@@ -517,11 +520,39 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">new_integrator_state</span><span class="p">(</span><span class="n">logdensity_fn</span><span class="p">,</span> <span class="n">position</span><span class="p">,</span> <span class="n">momentum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create an IntegratorState from a position and momentum.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    logdensity_fn</span>
+<span class="sd">        Log-density function of the target distribution.</span>
+<span class="sd">    position</span>
+<span class="sd">        Current position in the parameter space.</span>
+<span class="sd">    momentum</span>
+<span class="sd">        Current momentum.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    An IntegratorState with position, momentum, logdensity, and logdensity_grad.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">logdensity</span><span class="p">,</span> <span class="n">logdensity_grad</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">value_and_grad</span><span class="p">(</span><span class="n">logdensity_fn</span><span class="p">)(</span><span class="n">position</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">IntegratorState</span><span class="p">(</span><span class="n">position</span><span class="p">,</span> <span class="n">momentum</span><span class="p">,</span> <span class="n">logdensity</span><span class="p">,</span> <span class="n">logdensity_grad</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">euclidean_position_update_fn</span><span class="p">(</span><span class="n">logdensity_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build the position update operator for Euclidean HMC.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    logdensity_fn</span>
+<span class="sd">        Log-density function used to compute gradients after each position update.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    An ``update`` function with signature</span>
+<span class="sd">    ``(position, kinetic_grad, step_size, coef, auxiliary_info) -&gt;</span>
+<span class="sd">    (new_position, logdensity, logdensity_grad, None)``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">logdensity_and_grad_fn</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">value_and_grad</span><span class="p">(</span><span class="n">logdensity_fn</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span>
@@ -544,6 +575,19 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">euclidean_momentum_update_fn</span><span class="p">(</span><span class="n">kinetic_energy_fn</span><span class="p">:</span> <span class="n">KineticEnergy</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build the momentum update operator for Euclidean HMC.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    kinetic_energy_fn</span>
+<span class="sd">        Kinetic energy function whose gradient gives the velocity.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    An ``update`` function with signature</span>
+<span class="sd">    ``(momentum, logdensity_grad, step_size, coef, auxiliary_info, is_last_call) -&gt;</span>
+<span class="sd">    (new_momentum, kinetic_grad, None)``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">kinetic_energy_grad_fn</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">grad</span><span class="p">(</span><span class="n">kinetic_energy_fn</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span>
@@ -577,6 +621,15 @@
     <span class="n">position_update_info</span><span class="p">,</span>
     <span class="n">momentum_update_info</span><span class="p">,</span>
 <span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Format the output of a Euclidean integrator step into an IntegratorState.</span>
+
+<span class="sd">    Discards auxiliary integration info not needed for Euclidean dynamics.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    An IntegratorState with the updated position, momentum, logdensity, and</span>
+<span class="sd">    logdensity_grad.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">del</span> <span class="n">kinetic_grad</span><span class="p">,</span> <span class="n">position_update_info</span><span class="p">,</span> <span class="n">momentum_update_info</span>
     <span class="k">return</span> <span class="n">IntegratorState</span><span class="p">(</span><span class="n">position</span><span class="p">,</span> <span class="n">momentum</span><span class="p">,</span> <span class="n">logdensity</span><span class="p">,</span> <span class="n">logdensity_grad</span><span class="p">)</span>
 
@@ -584,8 +637,18 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">generate_euclidean_integrator</span><span class="p">(</span><span class="n">coefficients</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Generate symplectic integrator for solving a Hamiltonian system.</span>
 
-<span class="sd">    The resulting integrator is volume-preserve and preserves the symplectic structure</span>
-<span class="sd">    of phase space.</span>
+<span class="sd">    The resulting integrator is volume-preserving and preserves the symplectic</span>
+<span class="sd">    structure of phase space.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    coefficients</span>
+<span class="sd">        Palindromic list of alternating momentum/position update coefficients.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    A factory function ``euclidean_integrator(logdensity_fn, kinetic_energy_fn)``</span>
+<span class="sd">    that returns a one-step integrator ``(state, step_size) -&gt; new_state``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">euclidean_integrator</span><span class="p">(</span>
@@ -692,6 +755,21 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">esh_dynamics_momentum_update_one_step</span><span class="p">(</span><span class="n">inverse_mass_matrix</span><span class="o">=</span><span class="mf">1.0</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build the ESH dynamics momentum update operator.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    inverse_mass_matrix</span>
+<span class="sd">        Inverse mass matrix. Scalar or array.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    An ``update`` function implementing one ESH momentum update step.</span>
+<span class="sd">    The function signature is</span>
+<span class="sd">    ``(momentum, logdensity_grad, step_size, coef,</span>
+<span class="sd">    previous_kinetic_energy_change, is_last_call) -&gt;</span>
+<span class="sd">    (new_momentum, kinetic_grad, kinetic_energy_change)``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">sqrt_inverse_mass_matrix</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">inverse_mass_matrix</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span>
@@ -747,6 +825,13 @@
     <span class="n">position_update_info</span><span class="p">,</span>
     <span class="n">momentum_update_info</span><span class="p">,</span>
 <span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Format the output of an isokinetic integrator step.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    A tuple of ``(IntegratorState, momentum_update_info)`` where</span>
+<span class="sd">    ``momentum_update_info`` carries the accumulated kinetic energy change.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">del</span> <span class="n">kinetic_grad</span><span class="p">,</span> <span class="n">position_update_info</span>
     <span class="k">return</span> <span class="p">(</span>
         <span class="n">IntegratorState</span><span class="p">(</span><span class="n">position</span><span class="p">,</span> <span class="n">momentum</span><span class="p">,</span> <span class="n">logdensity</span><span class="p">,</span> <span class="n">logdensity_grad</span><span class="p">),</span>
@@ -755,6 +840,20 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">generate_isokinetic_integrator</span><span class="p">(</span><span class="n">coefficients</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generate an isokinetic (ESH-dynamics) integrator.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    coefficients</span>
+<span class="sd">        Palindromic list of alternating momentum/position update coefficients.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    A factory function ``isokinetic_integrator(logdensity_fn, inverse_mass_matrix)``</span>
+<span class="sd">    that returns a one-step integrator</span>
+<span class="sd">    ``(state, step_size) -&gt; (new_state, kinetic_energy_change)``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="k">def</span><span class="w"> </span><span class="nf">isokinetic_integrator</span><span class="p">(</span>
         <span class="n">logdensity_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">inverse_mass_matrix</span><span class="p">:</span> <span class="n">ArrayTree</span> <span class="o">=</span> <span class="mf">1.0</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GeneralIntegrator</span><span class="p">:</span>

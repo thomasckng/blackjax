@@ -52,7 +52,7 @@
     <link rel="search" title="Search" href="../../../search.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="0.1.dev1+gca4514fc9" />
+  <meta name="docsearch:version" content="0.1.dev1+g023ff19bf" />
   </head>
   
   
@@ -179,6 +179,7 @@
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/chees_adaptation/index.html">blackjax.adaptation.chees_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/laps/index.html">blackjax.adaptation.laps</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/laps_burn_in/index.html">blackjax.adaptation.laps_burn_in</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/low_rank_adaptation/index.html">blackjax.adaptation.low_rank_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/mass_matrix/index.html">blackjax.adaptation.mass_matrix</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/mclmc_adaptation/index.html">blackjax.adaptation.mclmc_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/meads_adaptation/index.html">blackjax.adaptation.meads_adaptation</a></li>
@@ -242,7 +243,9 @@
 </ul>
 </details></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../../../autoapi/blackjax/vi/index.html">blackjax.vi</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/vi/fullrank_vi/index.html">blackjax.vi.fullrank_vi</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/vi/meanfield_vi/index.html">blackjax.vi.meanfield_vi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/vi/multipathfinder/index.html">blackjax.vi.multipathfinder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/vi/pathfinder/index.html">blackjax.vi.pathfinder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/vi/schrodinger_follmer/index.html">blackjax.vi.schrodinger_follmer</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/vi/svgd/index.html">blackjax.vi.svgd</a></li>
@@ -458,7 +461,22 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">reorder_trajectories</span><span class="p">(</span>
     <span class="n">direction</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">trajectory</span><span class="p">:</span> <span class="n">Trajectory</span><span class="p">,</span> <span class="n">new_trajectory</span><span class="p">:</span> <span class="n">Trajectory</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Trajectory</span><span class="p">,</span> <span class="n">Trajectory</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Order the two trajectories depending on the direction.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Order two trajectories depending on the integration direction.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    direction</span>
+<span class="sd">        Integration direction: ``1`` for forward, ``-1`` for backward.</span>
+<span class="sd">    trajectory</span>
+<span class="sd">        The existing trajectory (from the previous expansion step).</span>
+<span class="sd">    new_trajectory</span>
+<span class="sd">        The newly sampled sub-trajectory.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    A ``(left_trajectory, right_trajectory)`` tuple ordered so that</span>
+<span class="sd">    ``left_trajectory`` precedes ``right_trajectory`` in time.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="n">jax</span><span class="o">.</span><span class="n">lax</span><span class="o">.</span><span class="n">cond</span><span class="p">(</span>
         <span class="n">direction</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span>
         <span class="k">lambda</span> <span class="n">_</span><span class="p">:</span> <span class="p">(</span>
@@ -477,6 +495,20 @@
 <div class="viewcode-block" id="merge_trajectories">
 <a class="viewcode-back" href="../../../autoapi/blackjax/mcmc/trajectory/index.html#blackjax.mcmc.trajectory.merge_trajectories">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">merge_trajectories</span><span class="p">(</span><span class="n">left_trajectory</span><span class="p">:</span> <span class="n">Trajectory</span><span class="p">,</span> <span class="n">right_trajectory</span><span class="p">:</span> <span class="n">Trajectory</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Merge two trajectories into one by concatenating left and right.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    left_trajectory</span>
+<span class="sd">        The left (earlier) sub-trajectory.</span>
+<span class="sd">    right_trajectory</span>
+<span class="sd">        The right (later) sub-trajectory.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    A new Trajectory spanning from the leftmost state of ``left_trajectory``</span>
+<span class="sd">    to the rightmost state of ``right_trajectory``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">momentum_sum</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
         <span class="n">jnp</span><span class="o">.</span><span class="n">add</span><span class="p">,</span> <span class="n">left_trajectory</span><span class="o">.</span><span class="n">momentum_sum</span><span class="p">,</span> <span class="n">right_trajectory</span><span class="o">.</span><span class="n">momentum_sum</span>
     <span class="p">)</span>
@@ -503,7 +535,20 @@
     <span class="n">integrator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">direction</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generate a trajectory by integrating several times in one direction.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generate a trajectory by integrating several times in one direction.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    integrator</span>
+<span class="sd">        One-step symplectic integrator.</span>
+<span class="sd">    direction</span>
+<span class="sd">        Integration direction: ``1`` for forward, ``-1`` for backward.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    An ``integrate(initial_state, step_size, num_integration_steps)`` function</span>
+<span class="sd">    that returns the final IntegratorState after all steps.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">integrate</span><span class="p">(</span>
         <span class="n">initial_state</span><span class="p">:</span> <span class="n">IntegratorState</span><span class="p">,</span> <span class="n">step_size</span><span class="p">,</span> <span class="n">num_integration_steps</span>
@@ -569,6 +614,11 @@
 <span class="sd">        Value of the difference of energy between two consecutive states above</span>
 <span class="sd">        which we say a transition is divergent.</span>
 
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    An ``integrate(rng_key, initial_state, direction, termination_state,</span>
+<span class="sd">    max_num_steps, step_size, initial_energy)`` function that returns</span>
+<span class="sd">    ``(proposal, new_trajectory, termination_state, is_diverging, has_terminated)``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">_</span><span class="p">,</span> <span class="n">generate_proposal</span> <span class="o">=</span> <span class="n">proposal_generator</span><span class="p">(</span><span class="n">hmc_energy</span><span class="p">(</span><span class="n">kinetic_energy</span><span class="p">))</span>
     <span class="n">sample_proposal</span> <span class="o">=</span> <span class="n">progressive_uniform_sampling</span>
@@ -714,7 +764,7 @@
 <span class="sd">    until the termination criterion is met.</span>
 
 <span class="sd">    This is the implementation of Algorithm 6 from :cite:p:`hoffman2014no` with</span>
-<span class="sd">    multinomial sampling. The implemenation here is mostly for validating the</span>
+<span class="sd">    multinomial sampling. The implementation here is mostly for validating the</span>
 <span class="sd">    progressive implementation to make sure the two are equivalent. The recursive</span>
 <span class="sd">    implementation should not be used for actually sampling as it cannot be jitted and</span>
 <span class="sd">    thus likely slow.</span>
@@ -734,6 +784,11 @@
 <span class="sd">        Bool to indicate whether to perform additional U turn check between two</span>
 <span class="sd">        trajectory.</span>
 
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    A ``buildtree_integrate(rng_key, initial_state, direction, tree_depth,</span>
+<span class="sd">    step_size, initial_energy)`` function that returns</span>
+<span class="sd">    ``(rng_key, proposal, trajectory, is_diverging, is_turning)``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">_</span><span class="p">,</span> <span class="n">generate_proposal</span> <span class="o">=</span> <span class="n">proposal_generator</span><span class="p">(</span><span class="n">hmc_energy</span><span class="p">(</span><span class="n">kinetic_energy</span><span class="p">))</span>
     <span class="n">sample_proposal</span> <span class="o">=</span> <span class="n">progressive_uniform_sampling</span>
@@ -924,14 +979,16 @@
 <span class="sd">        and the integrated trajectory.</span>
 <span class="sd">    uturn_check_fn</span>
 <span class="sd">        Function used to check the U-Turn criterion.</span>
-<span class="sd">    step_size</span>
-<span class="sd">        The step size used by the symplectic integrator.</span>
 <span class="sd">    max_num_expansions</span>
 <span class="sd">        The maximum number of trajectory expansions until the proposal is returned.</span>
 <span class="sd">    rate</span>
 <span class="sd">        The rate of the geometrical expansion. Typically 2 in NUTS, this is why</span>
 <span class="sd">        the literature often refers to &quot;tree doubling&quot;.</span>
 
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    An ``expand(rng_key, initial_expansion_state, initial_energy, step_size)``</span>
+<span class="sd">    function that returns ``(expansion_state, (is_diverging, is_turning))``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">proposal_sampler</span> <span class="o">=</span> <span class="n">progressive_biased_sampling</span>
 
@@ -1054,6 +1111,20 @@
 <div class="viewcode-block" id="hmc_energy">
 <a class="viewcode-back" href="../../../autoapi/blackjax/mcmc/trajectory/index.html#blackjax.mcmc.trajectory.hmc_energy">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">hmc_energy</span><span class="p">(</span><span class="n">kinetic_energy</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build the total HMC energy function from a kinetic energy function.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    kinetic_energy</span>
+<span class="sd">        A function that computes the kinetic energy given the momentum (and</span>
+<span class="sd">        optionally the position).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    An ``energy(state)`` function that returns the total energy</span>
+<span class="sd">    ``-logdensity + kinetic_energy(momentum)``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="k">def</span><span class="w"> </span><span class="nf">energy</span><span class="p">(</span><span class="n">state</span><span class="p">):</span>
         <span class="k">return</span> <span class="o">-</span><span class="n">state</span><span class="o">.</span><span class="n">logdensity</span> <span class="o">+</span> <span class="n">kinetic_energy</span><span class="p">(</span>
             <span class="n">state</span><span class="o">.</span><span class="n">momentum</span><span class="p">,</span> <span class="n">position</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">position</span>

@@ -114,7 +114,7 @@ Module Contents
    :rtype: Samples drawn from the approximate Pathfinder distribution
 
 
-.. py:function:: as_top_level_api(logdensity_fn: Callable) -> PathFinderAlgorithm
+.. py:function:: as_top_level_api(logdensity_fn: Callable) -> blackjax.base.VIAlgorithm
 
    Implements the (basic) user interface for the pathfinder kernel.
 
@@ -124,12 +124,12 @@ Module Contents
    Pathfinder returns draws from the approximation with the lowest estimated
    Kullback-Leibler (KL) divergence to the true posterior.
 
-   Note: all the heavy processing in performed in the init function, step
-   function is just a drawing a sample from a normal distribution
+   As Pathfinder is a one-shot algorithm, the returned ``VIAlgorithm.step``
+   is a no-op; all computation happens inside ``VIAlgorithm.init``.
 
    :param logdensity_fn: A function that represents the log-density of the model we want
                          to sample from.
 
-   :rtype: A ``VISamplingAlgorithm``.
+   :rtype: A ``VIAlgorithm``.
 
 

@@ -37,11 +37,11 @@ def model():
 [31m---------------------------------------------------------------------------[39m
 [31mAttributeError[39m                            Traceback (most recent call last)
 [36mCell[39m[36m [39m[32mIn[3][39m[32m, line 2[39m
-[32m      1[39m [38;5;28;01mfrom[39;00m[38;5;250m [39m[34;01mtensorflow_probability[39;00m[34;01m.[39;00m[34;01msubstrates[39;00m[38;5;250m [39m[38;5;28;01mimport[39;00m jax [38;5;28;01mas[39;00m tfp
-[32m----> [39m[32m2[39m tfd = [43mtfp[49m[43m.[49m[43mdistributions[49m
+[32m      1[39m [38;5;28;01mfrom[39;00m tensorflow_probability.substrates [38;5;28;01mimport[39;00m jax [38;5;28;01mas[39;00m tfp
+[32m----> [39m[32m2[39m tfd = tfp.distributions
 [32m      3[39m jdc = tfd.JointDistributionCoroutineAutoBatched
-[32m      5[39m [38;5;129m@jdc[39m
-[32m      6[39m [38;5;28;01mdef[39;00m[38;5;250m [39m[34mmodel[39m():
+[32m      4[39m 
+[32m      5[39m @jdc
 
 [36mFile [39m[32m/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/tensorflow_probability/python/internal/lazy_loader.py:56[39m, in [36mLazyLoader.__getattr__[39m[34m(self, item)[39m
 [32m     55[39m [38;5;28;01mdef[39;00m[38;5;250m [39m[34m__getattr__[39m([38;5;28mself[39m, item):
@@ -64,11 +64,11 @@ def model():
 
 [36mFile [39m[32m<frozen importlib._bootstrap>:1360[39m, in [36m_find_and_load[39m[34m(name, import_)[39m
 
-[36mFile [39m[32m<frozen importlib._bootstrap>:1331[39m, in [36m_find_and_load_unlocked[39m[34m(name, import_)[39m
+[36mFile [39m[32m<frozen importlib._bootstrap>:1334[39m, in [36m_find_and_load_unlocked[39m[34m(name, import_)[39m
 
-[36mFile [39m[32m<frozen importlib._bootstrap>:935[39m, in [36m_load_unlocked[39m[34m(spec)[39m
+[36mFile [39m[32m<frozen importlib._bootstrap>:950[39m, in [36m_load_unlocked[39m[34m(spec)[39m
 
-[36mFile [39m[32m<frozen importlib._bootstrap_external>:999[39m, in [36mexec_module[39m[34m(self, module)[39m
+[36mFile [39m[32m<frozen importlib._bootstrap_external>:999[39m, in [36m_LoaderBasics.exec_module[39m[34m(self, module)[39m
 
 [36mFile [39m[32m<frozen importlib._bootstrap>:488[39m, in [36m_call_with_frames_removed[39m[34m(f, *args, **kwds)[39m
 

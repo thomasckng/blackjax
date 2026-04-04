@@ -87,14 +87,36 @@ Module Contents
 
 .. py:function:: reorder_trajectories(direction: int, trajectory: Trajectory, new_trajectory: Trajectory) -> tuple[Trajectory, Trajectory]
 
-   Order the two trajectories depending on the direction.
+   Order two trajectories depending on the integration direction.
+
+   :param direction: Integration direction: ``1`` for forward, ``-1`` for backward.
+   :param trajectory: The existing trajectory (from the previous expansion step).
+   :param new_trajectory: The newly sampled sub-trajectory.
+
+   :returns: * A ``(left_trajectory, right_trajectory)`` tuple ordered so that
+             * ``left_trajectory`` precedes ``right_trajectory`` in time.
 
 
 .. py:function:: merge_trajectories(left_trajectory: Trajectory, right_trajectory: Trajectory)
 
+   Merge two trajectories into one by concatenating left and right.
+
+   :param left_trajectory: The left (earlier) sub-trajectory.
+   :param right_trajectory: The right (later) sub-trajectory.
+
+   :returns: * A new Trajectory spanning from the leftmost state of ``left_trajectory``
+             * to the rightmost state of ``right_trajectory``.
+
+
 .. py:function:: static_integration(integrator: Callable, direction: int = 1) -> Callable
 
    Generate a trajectory by integrating several times in one direction.
+
+   :param integrator: One-step symplectic integrator.
+   :param direction: Integration direction: ``1`` for forward, ``-1`` for backward.
+
+   :returns: * An ``integrate(initial_state, step_size, num_integration_steps)`` function
+             * *that returns the final IntegratorState after all steps.*
 
 
 .. py:class:: DynamicIntegrationState
@@ -129,6 +151,10 @@ Module Contents
    :param divergence_threshold: Value of the difference of energy between two consecutive states above
                                 which we say a transition is divergent.
 
+   :returns: * An ``integrate(rng_key, initial_state, direction, termination_state,
+             * max_num_steps, step_size, initial_energy)`` function that returns
+             * ``(proposal, new_trajectory, termination_state, is_diverging, has_terminated)``.
+
 
 .. py:function:: dynamic_recursive_integration(integrator: Callable, kinetic_energy: Callable, uturn_check_fn: Callable, divergence_threshold: float, use_robust_uturn_check: bool = False)
 
@@ -136,7 +162,7 @@ Module Contents
    until the termination criterion is met.
 
    This is the implementation of Algorithm 6 from :cite:p:`hoffman2014no` with
-   multinomial sampling. The implemenation here is mostly for validating the
+   multinomial sampling. The implementation here is mostly for validating the
    progressive implementation to make sure the two are equivalent. The recursive
    implementation should not be used for actually sampling as it cannot be jitted and
    thus likely slow.
@@ -148,6 +174,10 @@ Module Contents
                                 say a transition is divergent.
    :param use_robust_uturn_check: Bool to indicate whether to perform additional U turn check between two
                                   trajectory.
+
+   :returns: * A ``buildtree_integrate(rng_key, initial_state, direction, tree_depth,
+             * step_size, initial_energy)`` function that returns
+             * ``(rng_key, proposal, trajectory, is_diverging, is_turning)``.
 
 
 .. py:class:: DynamicExpansionState
@@ -185,11 +215,22 @@ Module Contents
    :param trajectory_integrator: A function that runs the symplectic integrators and returns a new proposal
                                  and the integrated trajectory.
    :param uturn_check_fn: Function used to check the U-Turn criterion.
-   :param step_size: The step size used by the symplectic integrator.
    :param max_num_expansions: The maximum number of trajectory expansions until the proposal is returned.
    :param rate: The rate of the geometrical expansion. Typically 2 in NUTS, this is why
                 the literature often refers to "tree doubling".
 
+   :returns: * An ``expand(rng_key, initial_expansion_state, initial_energy, step_size)``
+             * function that returns ``(expansion_state, (is_diverging, is_turning))``.
+
 
 .. py:function:: hmc_energy(kinetic_energy)
+
+   Build the total HMC energy function from a kinetic energy function.
+
+   :param kinetic_energy: A function that computes the kinetic energy given the momentum (and
+                          optionally the position).
+
+   :returns: * An ``energy(state)`` function that returns the total energy
+             * ``-logdensity + kinetic_energy(momentum)``.
+
 

@@ -52,10 +52,10 @@
     <link rel="index" title="Index" href="../../../../genindex.html" />
     <link rel="search" title="Search" href="../../../../search.html" />
     <link rel="next" title="blackjax.vi.schrodinger_follmer" href="../schrodinger_follmer/index.html" />
-    <link rel="prev" title="blackjax.vi.meanfield_vi" href="../meanfield_vi/index.html" />
+    <link rel="prev" title="blackjax.vi.multipathfinder" href="../multipathfinder/index.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="0.1.dev1+gca4514fc9" />
+  <meta name="docsearch:version" content="0.1.dev1+g023ff19bf" />
   </head>
   
   
@@ -180,6 +180,7 @@
 <li class="toctree-l3"><a class="reference internal" href="../../adaptation/chees_adaptation/index.html">blackjax.adaptation.chees_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../adaptation/laps/index.html">blackjax.adaptation.laps</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../adaptation/laps_burn_in/index.html">blackjax.adaptation.laps_burn_in</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../adaptation/low_rank_adaptation/index.html">blackjax.adaptation.low_rank_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../adaptation/mass_matrix/index.html">blackjax.adaptation.mass_matrix</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../adaptation/mclmc_adaptation/index.html">blackjax.adaptation.mclmc_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../adaptation/meads_adaptation/index.html">blackjax.adaptation.meads_adaptation</a></li>
@@ -243,7 +244,9 @@
 </ul>
 </details></li>
 <li class="toctree-l2 current active has-children"><a class="reference internal" href="../index.html">blackjax.vi</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../fullrank_vi/index.html">blackjax.vi.fullrank_vi</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../meanfield_vi/index.html">blackjax.vi.meanfield_vi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../multipathfinder/index.html">blackjax.vi.multipathfinder</a></li>
 <li class="toctree-l3 current active"><a class="current reference internal" href="#">blackjax.vi.pathfinder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../schrodinger_follmer/index.html">blackjax.vi.schrodinger_follmer</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../svgd/index.html">blackjax.vi.svgd</a></li>
@@ -415,7 +418,7 @@
 <tr class="row-even"><td><p><a class="reference internal" href="#blackjax.vi.pathfinder.sample" title="blackjax.vi.pathfinder.sample"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sample</span></code></a>() → blackjax.types.ArrayTree)</p></td>
 <td><p>Draw from the Pathfinder approximation of the target distribution.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#blackjax.vi.pathfinder.as_top_level_api" title="blackjax.vi.pathfinder.as_top_level_api"><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_top_level_api</span></code></a>(→ PathFinderAlgorithm)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#blackjax.vi.pathfinder.as_top_level_api" title="blackjax.vi.pathfinder.as_top_level_api"><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_top_level_api</span></code></a>(→ blackjax.base.VIAlgorithm)</p></td>
 <td><p>Implements the (basic) user interface for the pathfinder kernel.</p></td>
 </tr>
 </tbody>
@@ -534,22 +537,22 @@ algorithm</p></li>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="blackjax.vi.pathfinder.as_top_level_api">
-<span class="sig-name descname"><span class="pre">as_top_level_api</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">logdensity_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">PathFinderAlgorithm</span></span></span><a class="reference internal" href="../../../../_modules/blackjax/vi/pathfinder.html#as_top_level_api"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.vi.pathfinder.as_top_level_api" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">as_top_level_api</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">logdensity_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">blackjax.base.VIAlgorithm</span></span></span><a class="reference internal" href="../../../../_modules/blackjax/vi/pathfinder.html#as_top_level_api"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.vi.pathfinder.as_top_level_api" title="Link to this definition">#</a></dt>
 <dd><p>Implements the (basic) user interface for the pathfinder kernel.</p>
 <p>Pathfinder locates normal approximations to the target density along a
 quasi-Newton optimization path, with local covariance estimated using
 the inverse Hessian estimates produced by the L-BFGS optimizer.
 Pathfinder returns draws from the approximation with the lowest estimated
 Kullback-Leibler (KL) divergence to the true posterior.</p>
-<p>Note: all the heavy processing in performed in the init function, step
-function is just a drawing a sample from a normal distribution</p>
+<p>As Pathfinder is a one-shot algorithm, the returned <code class="docutils literal notranslate"><span class="pre">VIAlgorithm.step</span></code>
+is a no-op; all computation happens inside <code class="docutils literal notranslate"><span class="pre">VIAlgorithm.init</span></code>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>logdensity_fn</strong> – A function that represents the log-density of the model we want
 to sample from.</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p>A <code class="docutils literal notranslate"><span class="pre">VISamplingAlgorithm</span></code>.</p>
+<dd class="field-even"><p>A <code class="docutils literal notranslate"><span class="pre">VIAlgorithm</span></code>.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -569,12 +572,12 @@ to sample from.</p>
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="../meanfield_vi/index.html"
+       href="../multipathfinder/index.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">blackjax.vi.meanfield_vi</p>
+        <p class="prev-next-title">blackjax.vi.multipathfinder</p>
       </div>
     </a>
     <a class="right-next"

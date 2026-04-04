@@ -89,12 +89,10 @@ Module Contents
    Propose a new position such that its distance to the current position is
    normally distributed. Suitable for continuous variables.
 
-   Parameter
-   ---------
-   sigma:
-       vector or matrix that contains the standard deviation of the centered
-       normal distribution from which we draw the move proposals.
+   :param sigma: Vector or matrix that contains the standard deviation of the centered
+                 normal distribution from which we draw the move proposals.
 
+   :rtype: A callable that takes a PRNGKey and a position and returns a proposed move.
 
 
 .. py:class:: RWState
@@ -105,7 +103,7 @@ Module Contents
 
    position
        Current position of the chain.
-   log_density
+   logdensity
        Current value of the log-density
 
 

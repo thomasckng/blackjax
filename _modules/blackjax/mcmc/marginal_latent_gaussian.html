@@ -52,7 +52,7 @@
     <link rel="search" title="Search" href="../../../search.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="0.1.dev1+gca4514fc9" />
+  <meta name="docsearch:version" content="0.1.dev1+g023ff19bf" />
   </head>
   
   
@@ -179,6 +179,7 @@
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/chees_adaptation/index.html">blackjax.adaptation.chees_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/laps/index.html">blackjax.adaptation.laps</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/laps_burn_in/index.html">blackjax.adaptation.laps_burn_in</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/low_rank_adaptation/index.html">blackjax.adaptation.low_rank_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/mass_matrix/index.html">blackjax.adaptation.mass_matrix</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/mclmc_adaptation/index.html">blackjax.adaptation.mclmc_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/adaptation/meads_adaptation/index.html">blackjax.adaptation.meads_adaptation</a></li>
@@ -242,7 +243,9 @@
 </ul>
 </details></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../../../autoapi/blackjax/vi/index.html">blackjax.vi</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/vi/fullrank_vi/index.html">blackjax.vi.fullrank_vi</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/vi/meanfield_vi/index.html">blackjax.vi.meanfield_vi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/vi/multipathfinder/index.html">blackjax.vi.multipathfinder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/vi/pathfinder/index.html">blackjax.vi.pathfinder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/vi/schrodinger_follmer/index.html">blackjax.vi.schrodinger_follmer</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/vi/svgd/index.html">blackjax.vi.svgd</a></li>
@@ -385,10 +388,11 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">jax.scipy.linalg</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">linalg</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">jax.flatten_util</span><span class="w"> </span><span class="kn">import</span> <span class="n">ravel_pytree</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">blackjax.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">SamplingAlgorithm</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">blackjax.mcmc.proposal</span><span class="w"> </span><span class="kn">import</span> <span class="n">static_binomial_sampling</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">blackjax.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">Array</span><span class="p">,</span> <span class="n">PRNGKey</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">blackjax.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">Array</span><span class="p">,</span> <span class="n">ArrayLikeTree</span><span class="p">,</span> <span class="n">PRNGKey</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
     <span class="s2">&quot;MarginalState&quot;</span><span class="p">,</span>
@@ -399,28 +403,28 @@
 <span class="p">]</span>
 
 
-<span class="c1"># [TODO](https://github.com/blackjax-devs/blackjax/issues/237)</span>
 <div class="viewcode-block" id="MarginalState">
 <a class="viewcode-back" href="../../../autoapi/blackjax/mcmc/marginal_latent_gaussian/index.html#blackjax.mcmc.marginal_latent_gaussian.MarginalState">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">MarginalState</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;State of the RMH chain.</span>
 
-<span class="sd">    x</span>
-<span class="sd">        Current position of the chain.</span>
-<span class="sd">    log_p_x</span>
+<span class="sd">    position</span>
+<span class="sd">        Current position of the chain. Can be any PyTree.</span>
+<span class="sd">    logdensity</span>
 <span class="sd">        Current value of the log-likelihood of the model</span>
-<span class="sd">    grad_x</span>
-<span class="sd">        Current value of the gradient of the log-likelihood of the model</span>
+<span class="sd">    logdensity_grad</span>
+<span class="sd">        Current value of the gradient of the log-likelihood of the model.</span>
+<span class="sd">        Has the same PyTree structure as ``position``.</span>
 <span class="sd">    U_x</span>
-<span class="sd">        Auxiliary attributes</span>
+<span class="sd">        Position projected into the SVD basis (flat array).</span>
 <span class="sd">    U_grad_x</span>
-<span class="sd">        Gradient of the auxiliary attributes</span>
+<span class="sd">        Gradient projected into the SVD basis (flat array).</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
 
 <div class="viewcode-block" id="MarginalState.position">
 <a class="viewcode-back" href="../../../autoapi/blackjax/mcmc/marginal_latent_gaussian/index.html#blackjax.mcmc.marginal_latent_gaussian.MarginalState.position">[docs]</a>
-    <span class="n">position</span><span class="p">:</span> <span class="n">Array</span></div>
+    <span class="n">position</span><span class="p">:</span> <span class="n">ArrayLikeTree</span></div>
 
 <div class="viewcode-block" id="MarginalState.logdensity">
 <a class="viewcode-back" href="../../../autoapi/blackjax/mcmc/marginal_latent_gaussian/index.html#blackjax.mcmc.marginal_latent_gaussian.MarginalState.logdensity">[docs]</a>
@@ -428,7 +432,7 @@
 
 <div class="viewcode-block" id="MarginalState.logdensity_grad">
 <a class="viewcode-back" href="../../../autoapi/blackjax/mcmc/marginal_latent_gaussian/index.html#blackjax.mcmc.marginal_latent_gaussian.MarginalState.logdensity_grad">[docs]</a>
-    <span class="n">logdensity_grad</span><span class="p">:</span> <span class="n">Array</span></div>
+    <span class="n">logdensity_grad</span><span class="p">:</span> <span class="n">ArrayLikeTree</span></div>
 
 
 <div class="viewcode-block" id="MarginalState.U_x">
@@ -518,7 +522,7 @@
 <span class="sd">    logdensity_fn</span>
 <span class="sd">        The original log-density function</span>
 <span class="sd">    mean</span>
-<span class="sd">        The mean of the prior Gaussian density</span>
+<span class="sd">        The mean of the prior Gaussian density. Can be any PyTree.</span>
 <span class="sd">    covariance</span>
 <span class="sd">        The covariance of the prior Gaussian density.</span>
 
@@ -527,10 +531,12 @@
 <span class="sd">    A log-density function that is shifted by a constant</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">shift</span> <span class="o">=</span> <span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">covariance</span><span class="p">,</span> <span class="n">mean</span><span class="p">,</span> <span class="n">assume_a</span><span class="o">=</span><span class="s2">&quot;pos&quot;</span><span class="p">)</span>
+    <span class="n">mean_flat</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">ravel_pytree</span><span class="p">(</span><span class="n">mean</span><span class="p">)</span>
+    <span class="n">shift</span> <span class="o">=</span> <span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">covariance</span><span class="p">,</span> <span class="n">mean_flat</span><span class="p">,</span> <span class="n">assume_a</span><span class="o">=</span><span class="s2">&quot;pos&quot;</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">shifted_logdensity_fn</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">logdensity_fn</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">+</span> <span class="n">jnp</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">shift</span><span class="p">)</span>
+        <span class="n">x_flat</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">ravel_pytree</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">logdensity_fn</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">+</span> <span class="n">jnp</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">x_flat</span><span class="p">,</span> <span class="n">shift</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">shifted_logdensity_fn</span>
 
@@ -543,15 +549,21 @@
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
 <span class="sd">    position</span>
-<span class="sd">        The initial position of the chain.</span>
+<span class="sd">        The initial position of the chain. Can be any PyTree.</span>
 <span class="sd">    logdensity_fn</span>
 <span class="sd">        The logarithm of the likelihood function for the latent Gaussian model.</span>
 <span class="sd">    U_t</span>
 <span class="sd">        The unitary array of the covariance matrix.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">logdensity</span><span class="p">,</span> <span class="n">logdensity_grad</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">value_and_grad</span><span class="p">(</span><span class="n">logdensity_fn</span><span class="p">)(</span><span class="n">position</span><span class="p">)</span>
+    <span class="n">position_flat</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">ravel_pytree</span><span class="p">(</span><span class="n">position</span><span class="p">)</span>
+    <span class="n">logdensity_grad_flat</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">ravel_pytree</span><span class="p">(</span><span class="n">logdensity_grad</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">MarginalState</span><span class="p">(</span>
-        <span class="n">position</span><span class="p">,</span> <span class="n">logdensity</span><span class="p">,</span> <span class="n">logdensity_grad</span><span class="p">,</span> <span class="n">U_t</span> <span class="o">@</span> <span class="n">position</span><span class="p">,</span> <span class="n">U_t</span> <span class="o">@</span> <span class="n">logdensity_grad</span>
+        <span class="n">position</span><span class="p">,</span>
+        <span class="n">logdensity</span><span class="p">,</span>
+        <span class="n">logdensity_grad</span><span class="p">,</span>
+        <span class="n">U_t</span> <span class="o">@</span> <span class="n">position_flat</span><span class="p">,</span>
+        <span class="n">U_t</span> <span class="o">@</span> <span class="n">logdensity_grad_flat</span><span class="p">,</span>
     <span class="p">)</span></div>
 
 
@@ -578,6 +590,7 @@
         <span class="n">y_key</span><span class="p">,</span> <span class="n">u_key</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
 
         <span class="n">position</span><span class="p">,</span> <span class="n">logdensity</span><span class="p">,</span> <span class="n">logdensity_grad</span><span class="p">,</span> <span class="n">U_x</span><span class="p">,</span> <span class="n">U_grad_x</span> <span class="o">=</span> <span class="n">state</span>
+        <span class="n">position_flat</span><span class="p">,</span> <span class="n">unravel_fn</span> <span class="o">=</span> <span class="n">ravel_pytree</span><span class="p">(</span><span class="n">position</span><span class="p">)</span>
 
         <span class="c1"># Update Gamma(delta)</span>
         <span class="c1"># TODO: Ideally, we could have a dichotomy, where we only update Gamma(delta) if delta changes,</span>
@@ -588,13 +601,15 @@
 
         <span class="c1"># Propose a new y</span>
         <span class="n">temp</span> <span class="o">=</span> <span class="n">Gamma_1</span> <span class="o">*</span> <span class="p">(</span><span class="n">U_x</span> <span class="o">/</span> <span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">delta</span><span class="p">)</span> <span class="o">+</span> <span class="n">U_grad_x</span><span class="p">)</span>
-        <span class="n">temp</span> <span class="o">=</span> <span class="n">temp</span> <span class="o">+</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">Gamma_2</span><span class="p">)</span> <span class="o">*</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">y_key</span><span class="p">,</span> <span class="n">position</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
-        <span class="n">y</span> <span class="o">=</span> <span class="n">U</span> <span class="o">@</span> <span class="n">temp</span>
+        <span class="n">temp</span> <span class="o">=</span> <span class="n">temp</span> <span class="o">+</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">Gamma_2</span><span class="p">)</span> <span class="o">*</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">y_key</span><span class="p">,</span> <span class="n">position_flat</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">unravel_fn</span><span class="p">(</span><span class="n">U</span> <span class="o">@</span> <span class="n">temp</span><span class="p">)</span>
 
         <span class="c1"># Bookkeeping</span>
         <span class="n">log_p_y</span><span class="p">,</span> <span class="n">grad_y</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">value_and_grad</span><span class="p">(</span><span class="n">logdensity_fn</span><span class="p">)(</span><span class="n">y</span><span class="p">)</span>
-        <span class="n">U_y</span> <span class="o">=</span> <span class="n">U_t</span> <span class="o">@</span> <span class="n">y</span>
-        <span class="n">U_grad_y</span> <span class="o">=</span> <span class="n">U_t</span> <span class="o">@</span> <span class="n">grad_y</span>
+        <span class="n">y_flat</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">ravel_pytree</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+        <span class="n">grad_y_flat</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">ravel_pytree</span><span class="p">(</span><span class="n">grad_y</span><span class="p">)</span>
+        <span class="n">U_y</span> <span class="o">=</span> <span class="n">U_t</span> <span class="o">@</span> <span class="n">y_flat</span>
+        <span class="n">U_grad_y</span> <span class="o">=</span> <span class="n">U_t</span> <span class="o">@</span> <span class="n">grad_y_flat</span>
 
         <span class="c1"># Acceptance step</span>
         <span class="n">temp_x</span> <span class="o">=</span> <span class="n">Gamma_1</span> <span class="o">*</span> <span class="p">(</span><span class="n">U_x</span> <span class="o">/</span> <span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">delta</span><span class="p">)</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">U_grad_x</span><span class="p">)</span>
@@ -621,7 +636,7 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">as_top_level_api</span><span class="p">(</span>
     <span class="n">logdensity_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">covariance</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Array</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">mean</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Array</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">mean</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ArrayLikeTree</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">cov_svd</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">CovarianceSVD</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">step_size</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SamplingAlgorithm</span><span class="p">:</span>

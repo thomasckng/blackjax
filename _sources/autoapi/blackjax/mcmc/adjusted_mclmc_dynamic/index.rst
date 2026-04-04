@@ -22,7 +22,17 @@ Functions
 Module Contents
 ---------------
 
-.. py:function:: init(position: blackjax.types.ArrayLikeTree, logdensity_fn: Callable, random_generator_arg: blackjax.types.Array)
+.. py:function:: init(position: blackjax.types.ArrayLikeTree, logdensity_fn: Callable, random_generator_arg: blackjax.types.Array) -> blackjax.mcmc.dynamic_hmc.DynamicHMCState
+
+   Create an initial state for the dynamic MHMCHMC kernel.
+
+   :param position: Initial position of the chain.
+   :param logdensity_fn: Log-density function of the target distribution.
+   :param random_generator_arg: Argument passed to ``integration_steps_fn`` and ``next_random_arg_fn``
+                                to generate the number of integration steps.
+
+   :rtype: The initial DynamicHMCState.
+
 
 .. py:function:: build_kernel(integration_steps_fn, integrator: Callable = integrators.isokinetic_mclachlan, divergence_threshold: float = 1000, next_random_arg_fn: Callable = lambda key: jax.random.split(key)[1], inverse_mass_matrix=1.0)
 

@@ -55,7 +55,7 @@
     <link rel="prev" title="blackjax.mcmc.termination" href="../termination/index.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="0.1.dev1+gca4514fc9" />
+  <meta name="docsearch:version" content="0.1.dev1+g023ff19bf" />
   </head>
   
   
@@ -180,6 +180,7 @@
 <li class="toctree-l3"><a class="reference internal" href="../../adaptation/chees_adaptation/index.html">blackjax.adaptation.chees_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../adaptation/laps/index.html">blackjax.adaptation.laps</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../adaptation/laps_burn_in/index.html">blackjax.adaptation.laps_burn_in</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../adaptation/low_rank_adaptation/index.html">blackjax.adaptation.low_rank_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../adaptation/mass_matrix/index.html">blackjax.adaptation.mass_matrix</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../adaptation/mclmc_adaptation/index.html">blackjax.adaptation.mclmc_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../adaptation/meads_adaptation/index.html">blackjax.adaptation.meads_adaptation</a></li>
@@ -243,7 +244,9 @@
 </ul>
 </details></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../../vi/index.html">blackjax.vi</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../vi/fullrank_vi/index.html">blackjax.vi.fullrank_vi</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../vi/meanfield_vi/index.html">blackjax.vi.meanfield_vi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../vi/multipathfinder/index.html">blackjax.vi.multipathfinder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../vi/pathfinder/index.html">blackjax.vi.pathfinder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../vi/schrodinger_follmer/index.html">blackjax.vi.schrodinger_follmer</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../vi/svgd/index.html">blackjax.vi.svgd</a></li>
@@ -457,10 +460,10 @@ memory by keeping states that will subsequently be discarded.</p>
 <td><p>Append a state to the (right of the) trajectory to form a new trajectory.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#blackjax.mcmc.trajectory.reorder_trajectories" title="blackjax.mcmc.trajectory.reorder_trajectories"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reorder_trajectories</span></code></a>(→ tuple[Trajectory, Trajectory])</p></td>
-<td><p>Order the two trajectories depending on the direction.</p></td>
+<td><p>Order two trajectories depending on the integration direction.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#blackjax.mcmc.trajectory.merge_trajectories" title="blackjax.mcmc.trajectory.merge_trajectories"><code class="xref py py-obj docutils literal notranslate"><span class="pre">merge_trajectories</span></code></a>(left_trajectory, right_trajectory)</p></td>
-<td><p></p></td>
+<td><p>Merge two trajectories into one by concatenating left and right.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#blackjax.mcmc.trajectory.static_integration" title="blackjax.mcmc.trajectory.static_integration"><code class="xref py py-obj docutils literal notranslate"><span class="pre">static_integration</span></code></a>(→ Callable)</p></td>
 <td><p>Generate a trajectory by integrating several times in one direction.</p></td>
@@ -475,7 +478,7 @@ memory by keeping states that will subsequently be discarded.</p>
 <td><p>Sample a trajectory and update the proposal sequentially</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#blackjax.mcmc.trajectory.hmc_energy" title="blackjax.mcmc.trajectory.hmc_energy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">hmc_energy</span></code></a>(kinetic_energy)</p></td>
-<td><p></p></td>
+<td><p>Build the total HMC energy function from a kinetic energy function.</p></td>
 </tr>
 </tbody>
 </table>
@@ -517,18 +520,65 @@ memory by keeping states that will subsequently be discarded.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="blackjax.mcmc.trajectory.reorder_trajectories">
 <span class="sig-name descname"><span class="pre">reorder_trajectories</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">direction</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">trajectory</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#blackjax.mcmc.trajectory.Trajectory" title="blackjax.mcmc.trajectory.Trajectory"><span class="pre">Trajectory</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">new_trajectory</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#blackjax.mcmc.trajectory.Trajectory" title="blackjax.mcmc.trajectory.Trajectory"><span class="pre">Trajectory</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#blackjax.mcmc.trajectory.Trajectory" title="blackjax.mcmc.trajectory.Trajectory"><span class="pre">Trajectory</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#blackjax.mcmc.trajectory.Trajectory" title="blackjax.mcmc.trajectory.Trajectory"><span class="pre">Trajectory</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../../../_modules/blackjax/mcmc/trajectory.html#reorder_trajectories"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.mcmc.trajectory.reorder_trajectories" title="Link to this definition">#</a></dt>
-<dd><p>Order the two trajectories depending on the direction.</p>
+<dd><p>Order two trajectories depending on the integration direction.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>direction</strong> – Integration direction: <code class="docutils literal notranslate"><span class="pre">1</span></code> for forward, <code class="docutils literal notranslate"><span class="pre">-1</span></code> for backward.</p></li>
+<li><p><strong>trajectory</strong> – The existing trajectory (from the previous expansion step).</p></li>
+<li><p><strong>new_trajectory</strong> – The newly sampled sub-trajectory.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p>A <code class="docutils literal notranslate"><span class="pre">(left_trajectory,</span> <span class="pre">right_trajectory)</span></code> tuple ordered so that</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">left_trajectory</span></code> precedes <code class="docutils literal notranslate"><span class="pre">right_trajectory</span></code> in time.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="blackjax.mcmc.trajectory.merge_trajectories">
 <span class="sig-name descname"><span class="pre">merge_trajectories</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">left_trajectory</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#blackjax.mcmc.trajectory.Trajectory" title="blackjax.mcmc.trajectory.Trajectory"><span class="pre">Trajectory</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">right_trajectory</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#blackjax.mcmc.trajectory.Trajectory" title="blackjax.mcmc.trajectory.Trajectory"><span class="pre">Trajectory</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../../../_modules/blackjax/mcmc/trajectory.html#merge_trajectories"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.mcmc.trajectory.merge_trajectories" title="Link to this definition">#</a></dt>
-<dd></dd></dl>
+<dd><p>Merge two trajectories into one by concatenating left and right.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>left_trajectory</strong> – The left (earlier) sub-trajectory.</p></li>
+<li><p><strong>right_trajectory</strong> – The right (later) sub-trajectory.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p>A new Trajectory spanning from the leftmost state of <code class="docutils literal notranslate"><span class="pre">left_trajectory</span></code></p></li>
+<li><p>to the rightmost state of <code class="docutils literal notranslate"><span class="pre">right_trajectory</span></code>.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="blackjax.mcmc.trajectory.static_integration">
 <span class="sig-name descname"><span class="pre">static_integration</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">integrator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">direction</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Callable</span></span></span><a class="reference internal" href="../../../../_modules/blackjax/mcmc/trajectory.html#static_integration"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.mcmc.trajectory.static_integration" title="Link to this definition">#</a></dt>
 <dd><p>Generate a trajectory by integrating several times in one direction.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>integrator</strong> – One-step symplectic integrator.</p></li>
+<li><p><strong>direction</strong> – Integration direction: <code class="docutils literal notranslate"><span class="pre">1</span></code> for forward, <code class="docutils literal notranslate"><span class="pre">-1</span></code> for backward.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p>An <code class="docutils literal notranslate"><span class="pre">integrate(initial_state,</span> <span class="pre">step_size,</span> <span class="pre">num_integration_steps)</span></code> function</p></li>
+<li><p><em>that returns the final IntegratorState after all steps.</em></p></li>
+</ul>
+</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py class">
@@ -572,6 +622,14 @@ until the termination criterion is met.</p>
 which we say a transition is divergent.</p></li>
 </ul>
 </dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p>An <a href="#id2"><span class="problematic" id="id3">``</span></a>integrate(rng_key, initial_state, direction, termination_state,</p></li>
+<li><p>max_num_steps, step_size, initial_energy)`` function that returns</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">(proposal,</span> <span class="pre">new_trajectory,</span> <span class="pre">termination_state,</span> <span class="pre">is_diverging,</span> <span class="pre">has_terminated)</span></code>.</p></li>
+</ul>
+</p>
+</dd>
 </dl>
 </dd></dl>
 
@@ -580,8 +638,8 @@ which we say a transition is divergent.</p></li>
 <span class="sig-name descname"><span class="pre">dynamic_recursive_integration</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">integrator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kinetic_energy</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uturn_check_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">divergence_threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_robust_uturn_check</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../../../_modules/blackjax/mcmc/trajectory.html#dynamic_recursive_integration"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.mcmc.trajectory.dynamic_recursive_integration" title="Link to this definition">#</a></dt>
 <dd><p>Integrate a trajectory and update the proposal recursively in Python
 until the termination criterion is met.</p>
-<p>This is the implementation of Algorithm 6 from <span id="id2">[<a class="reference internal" href="../../../../bib.html#id16" title="Matthew D Hoffman, Andrew Gelman, and others. The no-u-turn sampler: adaptively setting path lengths in hamiltonian monte carlo. J. Mach. Learn. Res., 15(1):1593–1623, 2014.">HG+14</a>]</span> with
-multinomial sampling. The implemenation here is mostly for validating the
+<p>This is the implementation of Algorithm 6 from <span id="id4">[<a class="reference internal" href="../../../../bib.html#id16" title="Matthew D Hoffman, Andrew Gelman, and others. The no-u-turn sampler: adaptively setting path lengths in hamiltonian monte carlo. J. Mach. Learn. Res., 15(1):1593–1623, 2014.">HG+14</a>]</span> with
+multinomial sampling. The implementation here is mostly for validating the
 progressive implementation to make sure the two are equivalent. The recursive
 implementation should not be used for actually sampling as it cannot be jitted and
 thus likely slow.</p>
@@ -596,6 +654,14 @@ say a transition is divergent.</p></li>
 <li><p><strong>use_robust_uturn_check</strong> – Bool to indicate whether to perform additional U turn check between two
 trajectory.</p></li>
 </ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p>A <a href="#id5"><span class="problematic" id="id6">``</span></a>buildtree_integrate(rng_key, initial_state, direction, tree_depth,</p></li>
+<li><p>step_size, initial_energy)`` function that returns</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">(rng_key,</span> <span class="pre">proposal,</span> <span class="pre">trajectory,</span> <span class="pre">is_diverging,</span> <span class="pre">is_turning)</span></code>.</p></li>
+</ul>
+</p>
 </dd>
 </dl>
 </dd></dl>
@@ -642,11 +708,17 @@ until the termination criterion is met.</p>
 <li><p><strong>trajectory_integrator</strong> – A function that runs the symplectic integrators and returns a new proposal
 and the integrated trajectory.</p></li>
 <li><p><strong>uturn_check_fn</strong> – Function used to check the U-Turn criterion.</p></li>
-<li><p><strong>step_size</strong> – The step size used by the symplectic integrator.</p></li>
 <li><p><strong>max_num_expansions</strong> – The maximum number of trajectory expansions until the proposal is returned.</p></li>
 <li><p><strong>rate</strong> – The rate of the geometrical expansion. Typically 2 in NUTS, this is why
 the literature often refers to “tree doubling”.</p></li>
 </ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p>An <code class="docutils literal notranslate"><span class="pre">expand(rng_key,</span> <span class="pre">initial_expansion_state,</span> <span class="pre">initial_energy,</span> <span class="pre">step_size)</span></code></p></li>
+<li><p>function that returns <code class="docutils literal notranslate"><span class="pre">(expansion_state,</span> <span class="pre">(is_diverging,</span> <span class="pre">is_turning))</span></code>.</p></li>
+</ul>
+</p>
 </dd>
 </dl>
 </dd></dl>
@@ -654,7 +726,21 @@ the literature often refers to “tree doubling”.</p></li>
 <dl class="py function">
 <dt class="sig sig-object py" id="blackjax.mcmc.trajectory.hmc_energy">
 <span class="sig-name descname"><span class="pre">hmc_energy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">kinetic_energy</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../../../_modules/blackjax/mcmc/trajectory.html#hmc_energy"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.mcmc.trajectory.hmc_energy" title="Link to this definition">#</a></dt>
-<dd></dd></dl>
+<dd><p>Build the total HMC energy function from a kinetic energy function.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>kinetic_energy</strong> – A function that computes the kinetic energy given the momentum (and
+optionally the position).</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p>An <code class="docutils literal notranslate"><span class="pre">energy(state)</span></code> function that returns the total energy</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-logdensity</span> <span class="pre">+</span> <span class="pre">kinetic_energy(momentum)</span></code>.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
 
 </section>
 </section>

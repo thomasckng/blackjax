@@ -24,17 +24,25 @@ Functions
 Module Contents
 ---------------
 
-.. py:function:: init(position: blackjax.types.ArrayLikeTree, logdensity_fn: Callable)
+.. py:function:: init(position: blackjax.types.ArrayLikeTree, logdensity_fn: Callable) -> blackjax.mcmc.hmc.HMCState
+
+   Create an initial state for the MHMCHMC kernel.
+
+   :param position: Initial position of the chain.
+   :param logdensity_fn: Log-density function of the target distribution.
+
+   :rtype: The initial HMCState.
+
 
 .. py:function:: build_kernel(logdensity_fn: Callable, integrator: Callable = integrators.isokinetic_mclachlan, divergence_threshold: float = 1000, inverse_mass_matrix=1.0)
 
-   Build an MHMCHMC kernel where the number of integration steps is chosen randomly.
+   Build an MHMCHMC kernel.
 
-   :param integrator: The integrator to use to integrate the Hamiltonian dynamics.
-   :param divergence_threshold: Value of the difference in energy above which we consider that the transition is divergent.
-   :param next_random_arg_fn: Function that generates the next `random_generator_arg` from its previous value.
-   :param integration_steps_fn: Function that generates the next pseudo or quasi-random number of integration steps in the
-                                sequence, given the current `random_generator_arg`. Needs to return an `int`.
+   :param logdensity_fn: The log-density function of the target distribution.
+   :param integrator: The symplectic integrator to use to integrate the Hamiltonian dynamics.
+   :param divergence_threshold: Value of the difference in energy above which we consider that the
+                                transition is divergent.
+   :param inverse_mass_matrix: Inverse mass matrix for the isokinetic integrator. Scalar or array.
 
    :returns: * *A kernel that takes a rng_key and a Pytree that contains the current state*
              * *of the chain and that returns a new state of the chain along with*
@@ -47,13 +55,13 @@ Module Contents
 
    :param logdensity_fn: The log-density function we wish to draw samples from.
    :param step_size: The value to use for the step size in the symplectic integrator.
+   :param L_proposal_factor: Factor controlling partial momentum refreshment. ``jnp.inf`` disables
+                             refreshment (standard HMC-like behavior).
+   :param inverse_mass_matrix: Inverse mass matrix for the isokinetic integrator. Scalar or array.
    :param divergence_threshold: The absolute value of the difference in energy between two states above
-                                which we say that the transition is divergent. The default value is
-                                commonly found in other libraries, and yet is arbitrary.
-   :param integrator: (algorithm parameter) The symplectic integrator to use to integrate the trajectory.
-   :param next_random_arg_fn: Function that generates the next `random_generator_arg` from its previous value.
-   :param integration_steps_fn: Function that generates the next pseudo or quasi-random number of integration steps in the
-                                sequence, given the current `random_generator_arg`.
+                                which we say that the transition is divergent.
+   :param integrator: The symplectic integrator to use to integrate the trajectory.
+   :param num_integration_steps: Number of integration steps per transition.
 
    :rtype: A ``SamplingAlgorithm``.
 

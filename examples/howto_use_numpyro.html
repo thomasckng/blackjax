@@ -55,7 +55,7 @@
     <link rel="prev" title="Use with Aesara models" href="howto_use_aesara.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="0.1.dev1+gca4514fc9" />
+  <meta name="docsearch:version" content="0.1.dev1+g023ff19bf" />
   </head>
   
   
@@ -180,6 +180,7 @@
 <li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/adaptation/chees_adaptation/index.html">blackjax.adaptation.chees_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/adaptation/laps/index.html">blackjax.adaptation.laps</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/adaptation/laps_burn_in/index.html">blackjax.adaptation.laps_burn_in</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/adaptation/low_rank_adaptation/index.html">blackjax.adaptation.low_rank_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/adaptation/mass_matrix/index.html">blackjax.adaptation.mass_matrix</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/adaptation/mclmc_adaptation/index.html">blackjax.adaptation.mclmc_adaptation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/adaptation/meads_adaptation/index.html">blackjax.adaptation.meads_adaptation</a></li>
@@ -243,7 +244,9 @@
 </ul>
 </details></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../autoapi/blackjax/vi/index.html">blackjax.vi</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/vi/fullrank_vi/index.html">blackjax.vi.fullrank_vi</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/vi/meanfield_vi/index.html">blackjax.vi.meanfield_vi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/vi/multipathfinder/index.html">blackjax.vi.multipathfinder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/vi/pathfinder/index.html">blackjax.vi.pathfinder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/vi/schrodinger_follmer/index.html">blackjax.vi.schrodinger_follmer</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../autoapi/blackjax/vi/svgd/index.html">blackjax.vi.svgd</a></li>
@@ -526,8 +529,8 @@
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>\Average acceptance rate: 0.83
-There were 0.10% divergent transitions
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>\Average acceptance rate: 0.80
+There were 0.20% divergent transitions
 </pre></div>
 </div>
 </div>
@@ -551,7 +554,7 @@ There were 0.10% divergent transitions
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/5f06a84fd1725c3ca6066104d6a9b48cd06f2e56e7fcbf9828a51043ecff6ed1.png" src="../_images/5f06a84fd1725c3ca6066104d6a9b48cd06f2e56e7fcbf9828a51043ecff6ed1.png" />
+<img alt="../_images/e5454336af9a849e7494d583b47d460132cabb17f1aee4c36f1cb402ecb4d008.png" src="../_images/e5454336af9a849e7494d583b47d460132cabb17f1aee4c36f1cb402ecb4d008.png" />
 </div>
 </div>
 <div class="cell docutils container">
@@ -562,7 +565,7 @@ There were 0.10% divergent transitions
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/afab6581e8405b91d891760b6639771bbecd5ab95cf238ff476d13cc546dea45.png" src="../_images/afab6581e8405b91d891760b6639771bbecd5ab95cf238ff476d13cc546dea45.png" />
+<img alt="../_images/a3c78b22db1f99ca48f509dffc12752b54f6f1834783c245c2259611e396a588.png" src="../_images/a3c78b22db1f99ca48f509dffc12752b54f6f1834783c245c2259611e396a588.png" />
 </div>
 </div>
 <div class="cell tag_hide-input docutils container">
@@ -581,14 +584,14 @@ There were 0.10% divergent transitions
 </div>
 </details>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Relative treatment effect for school 0: 0.24
-Relative treatment effect for school 1: -0.55
-Relative treatment effect for school 2: 0.63
-Relative treatment effect for school 3: 0.34
-Relative treatment effect for school 4: 0.64
-Relative treatment effect for school 5: -0.36
-Relative treatment effect for school 6: 0.26
-Relative treatment effect for school 7: 0.04
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Relative treatment effect for school 0: -0.20
+Relative treatment effect for school 1: 0.36
+Relative treatment effect for school 2: -0.34
+Relative treatment effect for school 3: 0.46
+Relative treatment effect for school 4: -1.16
+Relative treatment effect for school 5: -0.13
+Relative treatment effect for school 6: 0.30
+Relative treatment effect for school 7: -0.13
 </pre></div>
 </div>
 </div>
