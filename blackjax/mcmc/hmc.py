@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Public API for the HMC Kernel"""
-from typing import Callable, NamedTuple, Union
+from typing import Callable, NamedTuple
 
 import jax
 
 import blackjax.mcmc.integrators as integrators
 import blackjax.mcmc.metrics as metrics
 import blackjax.mcmc.trajectory as trajectory
-from blackjax.base import SamplingAlgorithm
+from blackjax.base import SamplingAlgorithm, build_sampling_algorithm
 from blackjax.mcmc.proposal import safe_energy_diff, static_binomial_sampling
 from blackjax.mcmc.trajectory import hmc_energy
 from blackjax.types import ArrayLikeTree, ArrayTree, PRNGKey
@@ -235,28 +235,18 @@ def as_top_level_api(
 
     kernel = build_kernel(integrator, divergence_threshold)
     metric = metrics.default_metric(inverse_mass_matrix)
-
-    def init_fn(position: ArrayLikeTree, rng_key=None):
-        del rng_key
-        return init(position, logdensity_fn)
-
-    def step_fn(rng_key: PRNGKey, state):
-        return kernel(
-            rng_key,
-            state,
-            logdensity_fn,
-            step_size,
-            metric,
-            num_integration_steps,
-        )
-
-    return SamplingAlgorithm(init_fn, step_fn)
+    return build_sampling_algorithm(
+        kernel,
+        init,
+        logdensity_fn,
+        kernel_args=(step_size, metric, num_integration_steps),
+    )
 
 
 def hmc_proposal(
     integrator: Callable,
     kinetic_energy: metrics.KineticEnergy,
-    step_size: Union[float, ArrayLikeTree],
+    step_size: float | ArrayLikeTree,
     num_integration_steps: int = 1,
     divergence_threshold: float = 1000,
     *,

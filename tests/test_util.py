@@ -9,8 +9,8 @@ from jax import random as jr
 from jax import tree, vmap
 
 import blackjax
+from blackjax.diagnostics import psis_weights
 from blackjax.util import (
-    psis_weights,
     run_inference_algorithm,
     store_only_expectation_values,
     thin_algorithm,
@@ -141,17 +141,13 @@ class ThinInferenceAlgorithmTest(chex.TestCase):
         )
 
         if thinning == 1:
-            kernel = lambda inverse_mass_matrix: blackjax.mcmc.mclmc.build_kernel(
+            kernel = blackjax.mcmc.mclmc.build_kernel(
                 integrator=isokinetic_mclachlan,
-                logdensity_fn=self.logdf,
-                inverse_mass_matrix=inverse_mass_matrix,
             )
         else:
-            kernel = lambda inverse_mass_matrix: thin_kernel(
+            kernel = thin_kernel(
                 blackjax.mcmc.mclmc.build_kernel(
                     integrator=isokinetic_mclachlan,
-                    logdensity_fn=self.logdf,
-                    inverse_mass_matrix=inverse_mass_matrix,
                 ),
                 thinning=thinning,
                 info_transform=lambda info: tree.map(
@@ -161,6 +157,7 @@ class ThinInferenceAlgorithmTest(chex.TestCase):
 
         state, config, n_steps = blackjax.mclmc_find_L_and_step_size(
             mclmc_kernel=kernel,
+            logdensity_fn=self.logdf,
             num_steps=num_steps,
             state=state,
             rng_key=tune_key,

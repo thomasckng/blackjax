@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Public API for the Metropolis Hastings Microcanonical Hamiltonian Monte Carlo (MHMCHMC) Kernel. This is closely related to the Microcanonical Langevin Monte Carlo (MCLMC) Kernel, which is an unadjusted method. This kernel adds a Metropolis-Hastings correction to the MCLMC kernel. It also only refreshes the momentum variable after each MH step, rather than during the integration of the trajectory. Hence "Hamiltonian" and not "Langevin"."""
-from typing import Callable, Union
+from typing import Callable
 
 import jax
 import jax.numpy as jnp
 
 import blackjax.mcmc.integrators as integrators
-from blackjax.base import SamplingAlgorithm
+from blackjax.base import SamplingAlgorithm, build_sampling_algorithm
 from blackjax.mcmc.dynamic_hmc import DynamicHMCState, halton_sequence
 from blackjax.mcmc.hmc import HMCInfo
 from blackjax.mcmc.proposal import static_binomial_sampling
@@ -167,24 +167,18 @@ def as_top_level_api(
         divergence_threshold=divergence_threshold,
     )
 
-    def init_fn(position: ArrayLikeTree, rng_key: Array):
-        return init(position, logdensity_fn, rng_key)
-
-    def update_fn(rng_key: PRNGKey, state):
-        return kernel(
-            rng_key,
-            state,
-            logdensity_fn,
-            step_size,
-            L_proposal_factor,
-        )
-
-    return SamplingAlgorithm(init_fn, update_fn)  # type: ignore[arg-type]
+    return build_sampling_algorithm(
+        kernel,
+        init,
+        logdensity_fn,
+        kernel_args=(step_size, L_proposal_factor),
+        pass_rng_key_to_init=True,
+    )
 
 
 def adjusted_mclmc_proposal(
     integrator: Callable,
-    step_size: Union[float, ArrayLikeTree],
+    step_size: float | ArrayLikeTree,
     L_proposal_factor: float,
     num_integration_steps: int = 1,
     divergence_threshold: float = 1000,

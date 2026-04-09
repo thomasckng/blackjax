@@ -19,6 +19,7 @@ import jax
 import jax.numpy as jnp
 from jax.flatten_util import ravel_pytree
 
+from blackjax.eca import ensemble_execute_fn
 from blackjax.mcmc import mclmc
 from blackjax.mcmc.integrators import (
     IntegratorState,
@@ -26,7 +27,6 @@ from blackjax.mcmc.integrators import (
     isokinetic_velocity_verlet,
 )
 from blackjax.types import Array
-from blackjax.util import ensemble_execute_fn
 
 
 def no_nans(a):
@@ -38,25 +38,25 @@ def nan_reject(nonans, old, new):
     """Equivalent to
     return new if nonans else old"""
 
-    return jax.lax.cond(nonans, lambda _: new, lambda _: old, operand=None)
+    return jax.lax.cond(nonans, lambda: new, lambda: old)
 
 
 def build_kernel(logdensity_fn, ndims, microcanonical=True):
     """MCLMC kernel (with nan rejection)"""
 
     if microcanonical:
-        kernel = mclmc.build_kernel(
-            integrator=isokinetic_velocity_verlet,
-            logdensity_fn=logdensity_fn,
-            inverse_mass_matrix=jnp.ones(ndims),
-        )
+        kernel = mclmc.build_kernel(integrator=isokinetic_velocity_verlet)
     else:
         raise ValueError("Only microcanonical mode is supported for LAPS burn-in.")
+
+    inverse_mass_matrix = jnp.ones(ndims)
 
     def sequential_kernel(key, state, adap):
         new_state, info = kernel(
             key,
             state,
+            logdensity_fn,
+            inverse_mass_matrix,
             adap.L,
             adap.step_size,
         )
