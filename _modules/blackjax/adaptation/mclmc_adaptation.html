@@ -52,7 +52,7 @@
     <link rel="search" title="Search" href="../../../search.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="0.1.dev1+g023ff19bf" />
+  <meta name="docsearch:version" content="0.1.dev1+gc75da91f8" />
   </head>
   
   
@@ -189,6 +189,7 @@
 </ul>
 </details></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../autoapi/blackjax/diagnostics/index.html">blackjax.diagnostics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../autoapi/blackjax/eca/index.html">blackjax.eca</a></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../../../autoapi/blackjax/mcmc/index.html">blackjax.mcmc</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/mcmc/adjusted_mclmc/index.html">blackjax.mcmc.adjusted_mclmc</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/mcmc/adjusted_mclmc_dynamic/index.html">blackjax.mcmc.adjusted_mclmc_dynamic</a></li>
@@ -199,6 +200,8 @@
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/mcmc/ghmc/index.html">blackjax.mcmc.ghmc</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/mcmc/hmc/index.html">blackjax.mcmc.hmc</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/mcmc/integrators/index.html">blackjax.mcmc.integrators</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/mcmc/laplace_hmc/index.html">blackjax.mcmc.laplace_hmc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/mcmc/laplace_marginal/index.html">blackjax.mcmc.laplace_marginal</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/mcmc/mala/index.html">blackjax.mcmc.mala</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/mcmc/marginal_latent_gaussian/index.html">blackjax.mcmc.marginal_latent_gaussian</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../../autoapi/blackjax/mcmc/mclmc/index.html">blackjax.mcmc.mclmc</a></li>
@@ -429,6 +432,7 @@
     <span class="n">num_steps</span><span class="p">,</span>
     <span class="n">state</span><span class="p">,</span>
     <span class="n">rng_key</span><span class="p">,</span>
+    <span class="n">logdensity_fn</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">frac_tune1</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
     <span class="n">frac_tune2</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
     <span class="n">frac_tune3</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
@@ -437,7 +441,7 @@
     <span class="n">num_effective_samples</span><span class="o">=</span><span class="mi">150</span><span class="p">,</span>
     <span class="n">diagonal_preconditioning</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">Lfactor</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span>
+    <span class="n">l_factor</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Finds the optimal value of the parameters for the MCLMC algorithm.</span>
@@ -445,13 +449,17 @@
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
 <span class="sd">    mclmc_kernel</span>
-<span class="sd">        The kernel function used for the MCMC algorithm.</span>
+<span class="sd">        The kernel function built by ``mclmc.build_kernel``.  Its call signature</span>
+<span class="sd">        must be ``kernel(rng_key, state, logdensity_fn, inverse_mass_matrix, L,</span>
+<span class="sd">        step_size)``, matching the standard BlackJAX kernel pattern.</span>
 <span class="sd">    num_steps</span>
 <span class="sd">        The number of MCMC steps that will subsequently be run, after tuning.</span>
 <span class="sd">    state</span>
 <span class="sd">        The initial state of the MCMC algorithm.</span>
 <span class="sd">    rng_key</span>
 <span class="sd">        The random number generator key.</span>
+<span class="sd">    logdensity_fn</span>
+<span class="sd">        The log-density function of the target distribution.</span>
 <span class="sd">    frac_tune1</span>
 <span class="sd">        The fraction of tuning for the first step of the adaptation.</span>
 <span class="sd">    frac_tune2</span>
@@ -468,7 +476,7 @@
 <span class="sd">        Whether to do diagonal preconditioning (i.e. a mass matrix)</span>
 <span class="sd">    params</span>
 <span class="sd">        Initial params to start tuning from (optional)</span>
-<span class="sd">    Lfactor</span>
+<span class="sd">    l_factor</span>
 <span class="sd">        The factor scaling the estimated autocorrelation length to obtain momentum decoherence length L.</span>
 
 <span class="sd">    Returns</span>
@@ -478,23 +486,26 @@
 <span class="sd">    Example</span>
 <span class="sd">    -------</span>
 <span class="sd">    .. code::</span>
-<span class="sd">        kernel = lambda inverse_mass_matrix : blackjax.mcmc.mclmc.build_kernel(</span>
-<span class="sd">        logdensity_fn=logdensity_fn,</span>
-<span class="sd">        integrator=integrator,</span>
-<span class="sd">        inverse_mass_matrix=inverse_mass_matrix,</span>
-<span class="sd">        )</span>
+<span class="sd">        kernel = blackjax.mcmc.mclmc.build_kernel(integrator=integrator)</span>
 
 <span class="sd">        (</span>
 <span class="sd">            blackjax_state_after_tuning,</span>
 <span class="sd">            blackjax_mclmc_sampler_params,</span>
 <span class="sd">        ) = blackjax.mclmc_find_L_and_step_size(</span>
 <span class="sd">            mclmc_kernel=kernel,</span>
+<span class="sd">            logdensity_fn=logdensity_fn,</span>
 <span class="sd">            num_steps=num_steps,</span>
 <span class="sd">            state=initial_state,</span>
 <span class="sd">            rng_key=tune_key,</span>
 <span class="sd">            diagonal_preconditioning=preconditioning,</span>
 <span class="sd">        )</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">logdensity_fn</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;logdensity_fn is required. Pass the log-density function of the &quot;</span>
+            <span class="s2">&quot;target distribution.&quot;</span>
+        <span class="p">)</span>
+
     <span class="n">dim</span> <span class="o">=</span> <span class="n">pytree_size</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">position</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">params</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">params</span> <span class="o">=</span> <span class="n">MCLMCAdaptationState</span><span class="p">(</span>
@@ -512,6 +523,7 @@
 
     <span class="n">state</span><span class="p">,</span> <span class="n">params</span> <span class="o">=</span> <span class="n">make_L_step_size_adaptation</span><span class="p">(</span>
         <span class="n">kernel</span><span class="o">=</span><span class="n">mclmc_kernel</span><span class="p">,</span>
+        <span class="n">logdensity_fn</span><span class="o">=</span><span class="n">logdensity_fn</span><span class="p">,</span>
         <span class="n">dim</span><span class="o">=</span><span class="n">dim</span><span class="p">,</span>
         <span class="n">frac_tune1</span><span class="o">=</span><span class="n">frac_tune1</span><span class="p">,</span>
         <span class="n">frac_tune2</span><span class="o">=</span><span class="n">frac_tune2</span><span class="p">,</span>
@@ -524,7 +536,7 @@
 
     <span class="k">if</span> <span class="n">num_steps3</span> <span class="o">&gt;=</span> <span class="mi">2</span><span class="p">:</span>  <span class="c1"># at least 2 samples for ESS estimation</span>
         <span class="n">state</span><span class="p">,</span> <span class="n">params</span> <span class="o">=</span> <span class="n">make_adaptation_L</span><span class="p">(</span>
-            <span class="n">mclmc_kernel</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">inverse_mass_matrix</span><span class="p">),</span> <span class="n">frac</span><span class="o">=</span><span class="n">frac_tune3</span><span class="p">,</span> <span class="n">Lfactor</span><span class="o">=</span><span class="n">Lfactor</span>
+            <span class="n">mclmc_kernel</span><span class="p">,</span> <span class="n">logdensity_fn</span><span class="p">,</span> <span class="n">frac</span><span class="o">=</span><span class="n">frac_tune3</span><span class="p">,</span> <span class="n">l_factor</span><span class="o">=</span><span class="n">l_factor</span>
         <span class="p">)(</span><span class="n">state</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">num_steps</span><span class="p">,</span> <span class="n">part2_key</span><span class="p">)</span>
         <span class="n">total_num_tuning_integrator_steps</span> <span class="o">+=</span> <span class="n">num_steps3</span>
 
@@ -536,6 +548,7 @@
 <a class="viewcode-back" href="../../../autoapi/blackjax/adaptation/mclmc_adaptation/index.html#blackjax.adaptation.mclmc_adaptation.make_L_step_size_adaptation">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">make_L_step_size_adaptation</span><span class="p">(</span>
     <span class="n">kernel</span><span class="p">,</span>
+    <span class="n">logdensity_fn</span><span class="p">,</span>
     <span class="n">dim</span><span class="p">,</span>
     <span class="n">frac_tune1</span><span class="p">,</span>
     <span class="n">frac_tune2</span><span class="p">,</span>
@@ -557,9 +570,11 @@
         <span class="n">rng_key</span><span class="p">,</span> <span class="n">nan_key</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">rng_key</span><span class="p">)</span>
 
         <span class="c1"># dynamics</span>
-        <span class="n">next_state</span><span class="p">,</span> <span class="n">info</span> <span class="o">=</span> <span class="n">kernel</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">inverse_mass_matrix</span><span class="p">)(</span>
+        <span class="n">next_state</span><span class="p">,</span> <span class="n">info</span> <span class="o">=</span> <span class="n">kernel</span><span class="p">(</span>
             <span class="n">rng_key</span><span class="o">=</span><span class="n">rng_key</span><span class="p">,</span>
             <span class="n">state</span><span class="o">=</span><span class="n">previous_state</span><span class="p">,</span>
+            <span class="n">logdensity_fn</span><span class="o">=</span><span class="n">logdensity_fn</span><span class="p">,</span>
+            <span class="n">inverse_mass_matrix</span><span class="o">=</span><span class="n">params</span><span class="o">.</span><span class="n">inverse_mass_matrix</span><span class="p">,</span>
             <span class="n">L</span><span class="o">=</span><span class="n">params</span><span class="o">.</span><span class="n">L</span><span class="p">,</span>
             <span class="n">step_size</span><span class="o">=</span><span class="n">params</span><span class="o">.</span><span class="n">step_size</span><span class="p">,</span>
         <span class="p">)</span>
@@ -574,13 +589,18 @@
             <span class="n">nan_key</span><span class="p">,</span>
         <span class="p">)</span>
 
-        <span class="c1"># Warning: var = 0 if there were nans, but we will give it a very small weight</span>
+        <span class="c1"># Warning: var = 0 if there were nans, but we will give it a very small weight.</span>
+        <span class="c1">#</span>
+        <span class="c1"># The step-size adaptation exploits the scaling relation Var[E] = O(eps^6)</span>
+        <span class="c1"># for the leapfrog integrator (see Bou-Rabee &amp; Sanz-Serna, 2018).</span>
+        <span class="c1"># xi measures the energy-variance ratio relative to the target; the</span>
+        <span class="c1"># exponent 6.0 throughout this block originates from that relation.</span>
         <span class="n">xi</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">jnp</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="n">energy_change</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">dim</span> <span class="o">*</span> <span class="n">desired_energy_var</span><span class="p">)</span>
-        <span class="p">)</span> <span class="o">+</span> <span class="mf">1e-8</span>  <span class="c1"># 1e-8 is added to avoid divergences in log xi</span>
+        <span class="p">)</span> <span class="o">+</span> <span class="mf">1e-8</span>  <span class="c1"># small offset to prevent log(0) divergence</span>
         <span class="n">weight</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span>
             <span class="o">-</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">xi</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mf">6.0</span> <span class="o">*</span> <span class="n">trust_in_estimate</span><span class="p">))</span>
-        <span class="p">)</span>  <span class="c1"># the weight reduces the impact of stepsizes which are much larger on much smaller than the desired one.</span>
+        <span class="p">)</span>  <span class="c1"># Gaussian weight that down-weights step sizes far from the optimum</span>
 
         <span class="n">x_average</span> <span class="o">=</span> <span class="n">decay_rate</span> <span class="o">*</span> <span class="n">x_average</span> <span class="o">+</span> <span class="n">weight</span> <span class="o">*</span> <span class="p">(</span>
             <span class="n">xi</span> <span class="o">/</span> <span class="n">jnp</span><span class="o">.</span><span class="n">power</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">step_size</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">)</span>
@@ -588,7 +608,7 @@
         <span class="n">time</span> <span class="o">=</span> <span class="n">decay_rate</span> <span class="o">*</span> <span class="n">time</span> <span class="o">+</span> <span class="n">weight</span>
         <span class="n">step_size</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">power</span><span class="p">(</span>
             <span class="n">x_average</span> <span class="o">/</span> <span class="n">time</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.0</span> <span class="o">/</span> <span class="mf">6.0</span>
-        <span class="p">)</span>  <span class="c1"># We use the Var[E] = O(eps^6) relation here.</span>
+        <span class="p">)</span>  <span class="c1"># invert the Var[E] = O(eps^6) relation to obtain the optimal step size</span>
         <span class="n">step_size</span> <span class="o">=</span> <span class="p">(</span><span class="n">step_size</span> <span class="o">&lt;</span> <span class="n">step_size_max</span><span class="p">)</span> <span class="o">*</span> <span class="n">step_size</span> <span class="o">+</span> <span class="p">(</span>
             <span class="n">step_size</span> <span class="o">&gt;</span> <span class="n">step_size_max</span>
         <span class="p">)</span> <span class="o">*</span> <span class="n">step_size_max</span>  <span class="c1"># if the proposed stepsize is above the stepsize where we have seen divergences</span>
@@ -618,16 +638,18 @@
 
         <span class="k">return</span> <span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">adaptive_state</span><span class="p">,</span> <span class="n">streaming_avg</span><span class="p">),</span> <span class="kc">None</span>
 
-    <span class="n">run_steps</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">xs</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">lax</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span>
-        <span class="n">step</span><span class="p">,</span>
-        <span class="n">init</span><span class="o">=</span><span class="p">(</span>
-            <span class="n">state</span><span class="p">,</span>
-            <span class="n">params</span><span class="p">,</span>
-            <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">inf</span><span class="p">),</span>
-            <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dim</span><span class="p">),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dim</span><span class="p">)])),</span>
-        <span class="p">),</span>
-        <span class="n">xs</span><span class="o">=</span><span class="n">xs</span><span class="p">,</span>
-    <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">run_steps</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">params</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run adaptation steps via scan, returning final carry state.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">jax</span><span class="o">.</span><span class="n">lax</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span>
+            <span class="n">step</span><span class="p">,</span>
+            <span class="n">init</span><span class="o">=</span><span class="p">(</span>
+                <span class="n">state</span><span class="p">,</span>
+                <span class="n">params</span><span class="p">,</span>
+                <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">inf</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dim</span><span class="p">),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dim</span><span class="p">)])),</span>
+            <span class="p">),</span>
+            <span class="n">xs</span><span class="o">=</span><span class="n">xs</span><span class="p">,</span>
+        <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">L_step_size_adaptation</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">num_steps</span><span class="p">,</span> <span class="n">rng_key</span><span class="p">):</span>
         <span class="n">num_steps1</span><span class="p">,</span> <span class="n">num_steps2</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="n">num_steps</span> <span class="o">*</span> <span class="n">frac_tune1</span><span class="p">),</span> <span class="nb">round</span><span class="p">(</span>
@@ -678,7 +700,7 @@
 
 <div class="viewcode-block" id="make_adaptation_L">
 <a class="viewcode-back" href="../../../autoapi/blackjax/adaptation/mclmc_adaptation/index.html#blackjax.adaptation.mclmc_adaptation.make_adaptation_L">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">make_adaptation_L</span><span class="p">(</span><span class="n">kernel</span><span class="p">,</span> <span class="n">frac</span><span class="p">,</span> <span class="n">Lfactor</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_adaptation_L</span><span class="p">(</span><span class="n">kernel</span><span class="p">,</span> <span class="n">logdensity_fn</span><span class="p">,</span> <span class="n">frac</span><span class="p">,</span> <span class="n">l_factor</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;determine L by the autocorrelations (around 10 effective samples are needed for this to be accurate)&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">adaptation_L</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">num_steps</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
@@ -689,6 +711,8 @@
             <span class="n">next_state</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">kernel</span><span class="p">(</span>
                 <span class="n">rng_key</span><span class="o">=</span><span class="n">key</span><span class="p">,</span>
                 <span class="n">state</span><span class="o">=</span><span class="n">state</span><span class="p">,</span>
+                <span class="n">logdensity_fn</span><span class="o">=</span><span class="n">logdensity_fn</span><span class="p">,</span>
+                <span class="n">inverse_mass_matrix</span><span class="o">=</span><span class="n">params</span><span class="o">.</span><span class="n">inverse_mass_matrix</span><span class="p">,</span>
                 <span class="n">L</span><span class="o">=</span><span class="n">params</span><span class="o">.</span><span class="n">L</span><span class="p">,</span>
                 <span class="n">step_size</span><span class="o">=</span><span class="n">params</span><span class="o">.</span><span class="n">step_size</span><span class="p">,</span>
             <span class="p">)</span>
@@ -705,7 +729,7 @@
         <span class="n">ess</span> <span class="o">=</span> <span class="n">effective_sample_size</span><span class="p">(</span><span class="n">flat_samples</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span>
 
         <span class="k">return</span> <span class="n">state</span><span class="p">,</span> <span class="n">params</span><span class="o">.</span><span class="n">_replace</span><span class="p">(</span>
-            <span class="n">L</span><span class="o">=</span><span class="n">Lfactor</span> <span class="o">*</span> <span class="n">params</span><span class="o">.</span><span class="n">step_size</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">num_steps_3</span> <span class="o">/</span> <span class="n">ess</span><span class="p">)</span>
+            <span class="n">L</span><span class="o">=</span><span class="n">l_factor</span> <span class="o">*</span> <span class="n">params</span><span class="o">.</span><span class="n">step_size</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">num_steps_3</span> <span class="o">/</span> <span class="n">ess</span><span class="p">)</span>
         <span class="p">)</span>
 
     <span class="k">return</span> <span class="n">adaptation_L</span></div>
@@ -720,7 +744,7 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;if there are nans, let&#39;s reduce the stepsize, and not update the state. The</span>
 <span class="sd">    function returns the old state in this case.&quot;&quot;&quot;</span>
 
-    <span class="n">reduced_step_size</span> <span class="o">=</span> <span class="mf">0.8</span>
+    <span class="n">reduced_step_size</span> <span class="o">=</span> <span class="mf">0.8</span>  <span class="c1"># multiplicative shrinkage factor applied on NaN recovery</span>
     <span class="n">p</span><span class="p">,</span> <span class="n">unravel_fn</span> <span class="o">=</span> <span class="n">ravel_pytree</span><span class="p">(</span><span class="n">next_state</span><span class="o">.</span><span class="n">position</span><span class="p">)</span>
     <span class="n">q</span><span class="p">,</span> <span class="n">unravel_fn</span> <span class="o">=</span> <span class="n">ravel_pytree</span><span class="p">(</span><span class="n">next_state</span><span class="o">.</span><span class="n">momentum</span><span class="p">)</span>
     <span class="n">nonans</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">logical_and</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">p</span><span class="p">)),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">q</span><span class="p">)))</span>
@@ -740,36 +764,6 @@
 
     <span class="k">return</span> <span class="n">nonans</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">step_size</span><span class="p">,</span> <span class="n">kinetic_change</span></div>
 
-
-
-<span class="c1"># def handle_high_energy(</span>
-<span class="c1">#     previous_state, next_state, energy_change, key, inverse_mass_matrix, cutoff, euclidean=False</span>
-<span class="c1"># ):</span>
-
-
-<span class="c1">#     metric = metrics.default_metric(inverse_mass_matrix)</span>
-
-<span class="c1">#     new_momentum = jax.lax.cond(</span>
-<span class="c1">#         euclidean,</span>
-<span class="c1">#         lambda: metric.sample_momentum(key, previous_state.position),</span>
-<span class="c1">#         lambda: generate_unit_vector(key, previous_state.position),</span>
-<span class="c1">#     )</span>
-
-
-<span class="c1">#     # new_momentum = euclidean*metric.sample_momentum(key, previous_state.position) + (1-euclidean)*generate_unit_vector(key, previous_state.position)</span>
-<span class="c1">#     # new_momentum = generate_unit_vector(key, previous_state.position)</span>
-
-<span class="c1">#     state = jax.lax.cond(</span>
-<span class="c1">#         jnp.abs(energy_change) &gt; cutoff,</span>
-<span class="c1">#         lambda: previous_state._replace(</span>
-<span class="c1">#             # momentum=generate_unit_vector(key, next_state.position)</span>
-<span class="c1">#             momentum=new_momentum</span>
-<span class="c1">#         ),</span>
-<span class="c1">#         lambda: next_state,</span>
-<span class="c1">#     )</span>
-<span class="c1">#     energy_change = jnp.clip(energy_change, -cutoff, cutoff)</span>
-
-<span class="c1">#     return energy_change, state</span>
 </pre></div>
 
                 </article>

@@ -12,6 +12,7 @@ Submodules
 
    /autoapi/blackjax/adaptation/index
    /autoapi/blackjax/diagnostics/index
+   /autoapi/blackjax/eca/index
    /autoapi/blackjax/mcmc/index
    /autoapi/blackjax/sgmcmc/index
    /autoapi/blackjax/smc/index
@@ -23,11 +24,14 @@ Attributes
 
 .. autoapisummary::
 
+   blackjax.laplace_hmc
    blackjax.multipathfinder
 
 
 Package Contents
 ----------------
+
+.. py:data:: laplace_hmc
 
 .. py:data:: multipathfinder
 

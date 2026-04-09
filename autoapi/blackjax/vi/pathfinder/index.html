@@ -55,7 +55,7 @@
     <link rel="prev" title="blackjax.vi.multipathfinder" href="../multipathfinder/index.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="0.1.dev1+g023ff19bf" />
+  <meta name="docsearch:version" content="0.1.dev1+gc75da91f8" />
   </head>
   
   
@@ -190,6 +190,7 @@
 </ul>
 </details></li>
 <li class="toctree-l2"><a class="reference internal" href="../../diagnostics/index.html">blackjax.diagnostics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../eca/index.html">blackjax.eca</a></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../../mcmc/index.html">blackjax.mcmc</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l3"><a class="reference internal" href="../../mcmc/adjusted_mclmc/index.html">blackjax.mcmc.adjusted_mclmc</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../mcmc/adjusted_mclmc_dynamic/index.html">blackjax.mcmc.adjusted_mclmc_dynamic</a></li>
@@ -200,6 +201,8 @@
 <li class="toctree-l3"><a class="reference internal" href="../../mcmc/ghmc/index.html">blackjax.mcmc.ghmc</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../mcmc/hmc/index.html">blackjax.mcmc.hmc</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../mcmc/integrators/index.html">blackjax.mcmc.integrators</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../mcmc/laplace_hmc/index.html">blackjax.mcmc.laplace_hmc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../mcmc/laplace_marginal/index.html">blackjax.mcmc.laplace_marginal</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../mcmc/mala/index.html">blackjax.mcmc.mala</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../mcmc/marginal_latent_gaussian/index.html">blackjax.mcmc.marginal_latent_gaussian</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../mcmc/mclmc/index.html">blackjax.mcmc.mclmc</a></li>
@@ -434,7 +437,7 @@
 <p>Pathfinder locates normal approximations to the target density along a
 quasi-Newton optimization path, with local covariance estimated using
 the inverse Hessian estimates produced by the L-BFGS optimizer.
-PathfinderState stores for an interation fo the L-BFGS optimizer the
+PathfinderState stores for an iteration of the L-BFGS optimizer the
 resulting ELBO and all factors needed to sample from the approximated
 target density.</p>
 <dl class="simple">
@@ -442,7 +445,7 @@ target density.</p>
 </dd>
 <dt>grad_position:</dt><dd><p>gradient of target distribution wrt position</p>
 </dd>
-<dt>alpha, beta, gamma:</dt><dd><p>factored rappresentation of the inverse hessian</p>
+<dt>alpha, beta, gamma:</dt><dd><p>factored representation of the inverse hessian</p>
 </dd>
 <dt>elbo:</dt><dd><p>ELBO of approximation wrt target distribution</p>
 </dd>
@@ -490,18 +493,18 @@ the inverse Hessian estimates produced by the L-BFGS optimizer.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>rng_key</strong> – PRPNG key</p></li>
+<li><p><strong>rng_key</strong> – PRNG key</p></li>
 <li><p><strong>logdensity_fn</strong> – (un-normalized) log densify function of target distribution to take
 approximate samples from</p></li>
 <li><p><strong>initial_position</strong> – starting point of the L-BFGS optimization routine</p></li>
 <li><p><strong>num_samples</strong> – number of samples to draw to estimate ELBO</p></li>
-<li><p><strong>maxiter</strong> – Maximum number of iterations of the LGBFS algorithm.</p></li>
-<li><p><strong>maxcor</strong> – Maximum number of metric corrections of the LGBFS algorithm (“history
+<li><p><strong>maxiter</strong> – Maximum number of iterations of the L-BFGS algorithm.</p></li>
+<li><p><strong>maxcor</strong> – Maximum number of metric corrections of the L-BFGS algorithm (“history
 size”)</p></li>
-<li><p><strong>ftol</strong> – The LGBFS algorithm terminates the minimization when <cite>(f_k - f_{k+1}) &lt;
+<li><p><strong>ftol</strong> – The L-BFGS algorithm terminates the minimization when <cite>(f_k - f_{k+1}) &lt;
 ftol</cite></p></li>
-<li><p><strong>gtol</strong> – The LGBFS algorithm terminates the minimization when <cite>|g_k|_norm &lt; gtol</cite></p></li>
-<li><p><strong>maxls</strong> – The maximum number of line search steps (per iteration) for the LGBFS
+<li><p><strong>gtol</strong> – The L-BFGS algorithm terminates the minimization when <cite>|g_k|_norm &lt; gtol</cite></p></li>
+<li><p><strong>maxls</strong> – The maximum number of line search steps (per iteration) for the L-BFGS
 algorithm</p></li>
 <li><p><strong>**lbfgs_kwargs</strong> – other keyword arguments passed to <cite>jaxopt.LBFGS</cite>.</p></li>
 </ul>
@@ -519,7 +522,7 @@ algorithm</p></li>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="blackjax.vi.pathfinder.sample">
-<span class="sig-name descname"><span class="pre">sample</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rng_key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">blackjax.types.PRNGKey</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#blackjax.vi.pathfinder.PathfinderState" title="blackjax.vi.pathfinder.PathfinderState"><span class="pre">PathfinderState</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union[int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tuple[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tuple[int]]</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">blackjax.types.ArrayTree</span></span></span><a class="reference internal" href="../../../../_modules/blackjax/vi/pathfinder.html#sample"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.vi.pathfinder.sample" title="Link to this definition">#</a></dt>
+<span class="sig-name descname"><span class="pre">sample</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rng_key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">blackjax.types.PRNGKey</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#blackjax.vi.pathfinder.PathfinderState" title="blackjax.vi.pathfinder.PathfinderState"><span class="pre">PathfinderState</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span> <span class="pre">|</span> <span class="pre">tuple[]</span> <span class="pre">|</span> <span class="pre">tuple[int]</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">blackjax.types.ArrayTree</span></span></span><a class="reference internal" href="../../../../_modules/blackjax/vi/pathfinder.html#sample"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#blackjax.vi.pathfinder.sample" title="Link to this definition">#</a></dt>
 <dd><p>Draw from the Pathfinder approximation of the target distribution.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>

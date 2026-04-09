@@ -206,7 +206,7 @@ Module Contents
              * *information about the transition.*
 
 
-.. py:function:: irmh_as_top_level_api(logdensity_fn: Callable, proposal_distribution: Callable, proposal_logdensity_fn: Optional[Callable] = None) -> blackjax.base.SamplingAlgorithm
+.. py:function:: irmh_as_top_level_api(logdensity_fn: Callable, proposal_distribution: Callable, proposal_logdensity_fn: Callable | None = None) -> blackjax.base.SamplingAlgorithm
 
    Implements the (basic) user interface for the independent RMH.
 
@@ -246,7 +246,7 @@ Module Contents
              * *information about the transition.*
 
 
-.. py:function:: rmh_as_top_level_api(logdensity_fn: Callable, proposal_generator: Callable[[blackjax.types.PRNGKey, blackjax.types.ArrayLikeTree], blackjax.types.ArrayTree], proposal_logdensity_fn: Optional[Callable[[blackjax.types.ArrayLikeTree], blackjax.types.ArrayTree]] = None) -> blackjax.base.SamplingAlgorithm
+.. py:function:: rmh_as_top_level_api(logdensity_fn: Callable, proposal_generator: Callable[[blackjax.types.PRNGKey, blackjax.types.ArrayLikeTree], blackjax.types.ArrayTree], proposal_logdensity_fn: Callable[[blackjax.types.ArrayLikeTree], blackjax.types.ArrayTree] | None = None) -> blackjax.base.SamplingAlgorithm
 
    Implements the user interface for the RMH.
 
@@ -277,7 +277,34 @@ Module Contents
    :rtype: A ``SamplingAlgorithm``.
 
 
-.. py:function:: build_rmh_transition_energy(proposal_logdensity_fn: Optional[Callable]) -> Callable
+.. py:function:: build_rmh_transition_energy(proposal_logdensity_fn: Callable | None) -> Callable
+
+   Build the transition energy function for the Random Walk Metropolis-Hastings kernel.
+
+   For a symmetric proposal (``proposal_logdensity_fn is None``) the transition
+   energy reduces to ``-logdensity(new_state)``.  For an asymmetric proposal
+   it includes the log-density ratio of the proposal distribution, giving
+   ``-logdensity(new_state) - log q(new_state -> prev_state)``.
+
+   :param proposal_logdensity_fn: Log-density of the proposal distribution evaluated at ``(from_state,
+                                  to_state)``, or ``None`` for a symmetric proposal.
+
+   :rtype: A callable ``(prev_state, new_state) -> transition_energy``.
+
 
 .. py:function:: rmh_proposal(logdensity_fn: Callable, transition_distribution: Callable, compute_acceptance_ratio: Callable, sample_proposal: Callable = proposal.static_binomial_sampling) -> Callable
+
+   Build a Random Walk Metropolis-Hastings proposal generator.
+
+   Draws a new position from ``transition_distribution``, evaluates the
+   log-density, computes the acceptance ratio, and accepts or rejects
+   via ``sample_proposal``.
+
+   :param logdensity_fn: Log-density of the target distribution.
+   :param transition_distribution: Callable ``(rng_key, position) -> new_position``.
+   :param compute_acceptance_ratio: Callable ``(prev_state, proposed_state) -> log_acceptance_ratio``.
+   :param sample_proposal: Accept/reject sampler; defaults to static binomial sampling.
+
+   :rtype: A callable ``(rng_key, state) -> (new_state, do_accept, p_accept)``.
+
 
