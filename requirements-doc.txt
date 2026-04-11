@@ -10,7 +10,6 @@ numba
 numpyro
 optax
 oryx @ git+https://github.com/jax-ml/oryx.git
-tfp-nightly[jax]
 pymc
 pytensor
 scikit-learn
@@ -22,4 +21,5 @@ sphinx-book-theme
 sphinx-design
 sphinx-math-dollar
 sphinxcontrib-bibtex
+tfp-nightly[jax]
 versioneer
