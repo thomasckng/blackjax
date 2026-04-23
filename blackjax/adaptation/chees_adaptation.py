@@ -354,7 +354,7 @@ def chees_adaptation(
             optim,
             num_warmup_steps,
         )
-        kernel = blackjax.dynamic_hmc(logdensity_fn, **parameters).step
+        kernel = blackjax.dhmc(logdensity_fn, **parameters).step
         new_states, info = jax.vmap(kernel)(key_sample, last_states)
 
     Parameters
@@ -447,8 +447,9 @@ def chees_adaptation(
                 logdensity_fn=logdensity_fn,
                 step_size=adaptation_state.step_size,
                 inverse_mass_matrix=jnp.ones(num_dim),
-                num_leapfrog_steps=adaptation_state.trajectory_length
-                / adaptation_state.step_size,
+                integration_steps_params=(
+                    adaptation_state.trajectory_length / adaptation_state.step_size,
+                ),
             )
             new_states, info = jax.vmap(_step_fn)(keys, states)
             new_adaptation_state = update(
@@ -483,9 +484,8 @@ def chees_adaptation(
             "step_size": jnp.exp(last_adaptation_state.log_step_size_moving_average),
             "inverse_mass_matrix": jnp.ones(num_dim),
             "next_random_arg_fn": next_random_arg_fn,
-            "integration_steps_fn": lambda arg: integration_steps_fn(
-                arg, num_leapfrog_steps
-            ),
+            "integration_steps_fn": integration_steps_fn,
+            "integration_steps_params": (num_leapfrog_steps,),
         }
 
         return AdaptationResults(last_states, parameters), info

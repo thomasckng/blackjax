@@ -84,6 +84,7 @@ maxdepth: 1
 hidden:
 ---
 Quickstart <examples/quickstart.md>
+Speed-up Guide <examples/speed_up_guide.md>
 ```
 
 ```{toctree}
@@ -92,7 +93,7 @@ maxdepth: 1
 caption: PPL INTEGRATION
 hidden:
 ---
-Aesara<examples/howto_use_aesara.md>
+PyTensor<examples/howto_use_pytensor.md>
 Numpyro<examples/howto_use_numpyro.md>
 Oryx<examples/howto_use_oryx.md>
 PyMC<examples/howto_use_pymc.md>
@@ -129,4 +130,14 @@ maxdepth: 2
 ---
 API Reference<autoapi/blackjax/index>
 Bibliography<bib.rst>
+```
+
+```{toctree}
+---
+maxdepth: 1
+caption: DEVELOPER DOCUMENTATION
+hidden:
+---
+Design Principles <developer/design_principles.md>
+Contributing a New Algorithm <developer/new_algorithm_guide.md>
 ```
