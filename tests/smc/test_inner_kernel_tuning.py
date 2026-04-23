@@ -153,10 +153,9 @@ class MeanAndStdFromParticlesTest(BlackJAXTest):
 
     def test_mean_and_std_multivariate_particles(self):
         # We use shape=(N, 1) to create perfectly correlated particles
-        particles = (
-            jnp.array([10.0, 15.0])
-            + jax.random.normal(self.next_key(), shape=(2000, 1)) * jnp.array([0.5, 0.7])
-        )
+        particles = jnp.array([10.0, 15.0]) + jax.random.normal(
+            self.next_key(), shape=(2000, 1)
+        ) * jnp.array([0.5, 0.7])
 
         mean = particles_means(particles)
         std = particles_stds(particles)
